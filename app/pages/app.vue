@@ -25,13 +25,13 @@
                         <v-col cols="6">
                             <v-card variant="tonal" class="pa-2 text-center" color="primary">
                                 <div class="text-caption">Locations</div>
-                                <div class="text-h6 font-weight-bold">{{ locationData.length }}</div>
+                                <div class="text-h6 font-weight-bold">{{ filteredCount }}</div>
                             </v-card>
                         </v-col>
                         <v-col cols="6">
                             <v-card variant="tonal" class="pa-2 text-center" color="secondary">
                                 <div class="text-caption">Total Zones</div>
-                                <div class="text-h6 font-weight-bold">{{ availableZones.length }}</div>
+                                <div class="text-h6 font-weight-bold">{{ filteredZoneCount }}</div>
                             </v-card>
                         </v-col>
                     </v-row>
@@ -52,8 +52,9 @@
                     </v-slider>
 
                     <v-list-subheader>Zone Filter</v-list-subheader>
-                    <v-select v-model="zoneFilter" :items="['All', ...availableZones]" density="compact"
-                        variant="outlined" class="px-2" color="primary" @update:model-value="applyFilter"></v-select>
+                    <v-autocomplete v-model="zoneFilter" :items="availableZones" density="compact" variant="outlined"
+                        class="px-2" color="primary" multiple chips closable-chips clearable
+                        placeholder="Search zones..." @update:model-value="applyFilter"></v-autocomplete>
                 </div>
 
                 <v-divider class="mb-6"></v-divider>
@@ -115,10 +116,12 @@ const CONFIG = {
 
 const drawer = ref(true);
 const levelFilter = ref(0);
-const zoneFilter = ref('All');
+const zoneFilter = ref<string[]>([]);
 const maxLevels = ref(1);
 const availableZones = ref<string[]>([]);
 const locationData = ref<any[]>([]);
+const filteredCount = ref(0);
+const filteredZoneCount = ref(0);
 const hoveredData = ref<any>(null);
 const tooltipPos = reactive({ x: 0, y: 0 });
 
@@ -247,6 +250,8 @@ function renderLocations(locations: any[]) {
 
     const zones = Array.from(new Set(locations.map(d => d.zone))).sort();
     availableZones.value = zones;
+    filteredCount.value = locations.length;
+    filteredZoneCount.value = zones.length;
 }
 
 function getMax(arr: number[]): number {
@@ -282,14 +287,18 @@ function applyFilter() {
     const compWidth = CONFIG.boxSize.depth + CONFIG.gapBetweenCompartments;
     const levelHeight = CONFIG.boxSize.height + CONFIG.gapBetweenLevels;
 
+    let count = 0;
+    const activeZones = new Set<string>();
     locationData.value.forEach((data, i) => {
         const zLevel = parseInt(data.z);
         const levelMatch = (levelFilter.value === 0) || (zLevel === levelFilter.value);
-        const zoneMatch = (zoneFilter.value === 'All') || (data.zone === zoneFilter.value);
+        const zoneMatch = (zoneFilter.value.length === 0) || (zoneFilter.value.includes(data.zone));
 
         const visible = levelMatch && zoneMatch;
 
         if (visible) {
+            count++;
+            activeZones.add(data.zone);
             dummy.position.set(
                 (parseInt(data.x) - 1) * CONFIG.rackSpacing,
                 (CONFIG.boxSize.height / 2) + (parseInt(data.z) - 1) * levelHeight,
@@ -302,6 +311,8 @@ function applyFilter() {
         dummy.updateMatrix();
         instancedMesh!.setMatrixAt(i, dummy.matrix);
     });
+    filteredCount.value = count;
+    filteredZoneCount.value = activeZones.size;
     instancedMesh.instanceMatrix.needsUpdate = true;
 }
 
