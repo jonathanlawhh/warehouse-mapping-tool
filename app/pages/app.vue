@@ -111,7 +111,7 @@ const CONFIG = {
         floor: '#676767',
         grid: 0x1e293b,
     },
-    rackSpacing: 10
+    rackSpacing: 8
 };
 
 const drawer = ref(true);
@@ -148,7 +148,7 @@ function initThree() {
     scene.background = new THREE.Color(CONFIG.colors.background);
 
     camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
-    camera.position.set(25, 20, 40);
+    camera.position.set(15, 90, 150);
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(width, height);
@@ -159,13 +159,13 @@ function initThree() {
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.minDistance = 1;
-    controls.maxDistance = 500;
+    controls.maxDistance = 600;
     controls.maxPolarAngle = Math.PI / 2 - 0.05;
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
     scene.add(ambientLight);
 
-    const floorGeometry = new THREE.PlaneGeometry(800, 400);
+    const floorGeometry = new THREE.PlaneGeometry(1000, 400);
     const floorMaterial = new THREE.MeshStandardMaterial({
         color: CONFIG.colors.floor
     });
