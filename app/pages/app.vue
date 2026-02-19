@@ -243,10 +243,19 @@ function renderLocations(locations: any[]) {
     scene.add(instancedMesh);
 
     const levels = locations.map(d => parseInt(d.z) || 1);
-    maxLevels.value = Math.max(...levels, 1);
+    maxLevels.value = getMax(levels);
 
     const zones = Array.from(new Set(locations.map(d => d.zone))).sort();
     availableZones.value = zones;
+}
+
+function getMax(arr: number[]): number {
+    if (arr.length === 0) return 0;
+    let max = arr[0];
+    for (let i = 1; i < arr.length; i++) {
+        if (arr[i] > max) max = arr[i];
+    }
+    return max;
 }
 
 function resetView() {
@@ -391,8 +400,11 @@ function handleCSVUpload(event: any) {
             const vals = lines[i].split(',').map(v => v.trim());
             if (vals.length < 5) continue;
             results.push({
-                x: vals[colMap['x'] || 0], y: vals[colMap['y'] || 1], z: vals[colMap['z'] || 2],
-                zone: vals[colMap['zone'] || 3], name: vals[colMap['name'] || 4]
+                x: vals[parseInt(colMap['x'] || 0)],
+                y: vals[parseInt(colMap['y'] || 1)],
+                z: vals[parseInt(colMap['z'] || 2)],
+                zone: String(vals[colMap['zone'] || 3]).toUpperCase().replaceAll('"', ""),
+                name: String(vals[colMap['name'] || 4]).toUpperCase().replaceAll('"', "")
             });
         }
         if (results.length > 0) {
