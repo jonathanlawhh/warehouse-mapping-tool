@@ -300,6 +300,7 @@ function applyFilter() {
 
     let count = 0;
     const activeZones = new Set<string>();
+    const zonesInLevel = new Set<string>();
     const zoneFilterSet = new Set(zoneFilter.value);
     const hasZoneFilter = zoneFilterSet.size > 0;
     const currentLevelFilter = levelFilter.value;
@@ -311,6 +312,11 @@ function applyFilter() {
     for (let i = 0; i < total; i++) {
         const data = dataList[i];
         const levelMatch = (currentLevelFilter === 0) || (data.z === currentLevelFilter);
+
+        if (levelMatch) {
+            zonesInLevel.add(data.zone);
+        }
+
         const zoneMatch = !hasZoneFilter || zoneFilterSet.has(data.zone);
 
         if (levelMatch && zoneMatch) {
@@ -335,6 +341,7 @@ function applyFilter() {
     }
     filteredCount.value = count;
     filteredZoneCount.value = activeZones.size;
+    availableZones.value = Array.from(zonesInLevel).sort();
     instancedMesh.instanceMatrix.needsUpdate = true;
 }
 
