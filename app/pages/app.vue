@@ -372,7 +372,7 @@ function animate() {
     requestAnimationFrame(animate);
 
     if (keys.w || keys.a || keys.s || keys.d || keys.q || keys.e) {
-        const flySpeed = keys.shift ? 4.0 : 1.0;
+        const flySpeed = keys.shift ? 8.0 : 3.0;
         const forward = new THREE.Vector3();
         camera.getWorldDirection(forward);
 
