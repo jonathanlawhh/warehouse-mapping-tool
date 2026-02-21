@@ -63,9 +63,14 @@
                     <div class="text-overline mb-2">Controls</div>
                     <v-row dense>
                         <v-col cols="12">
-                            <v-btn color="primary" variant="outlined" @click="resetView">Reset Camera</v-btn>
+                            <v-btn color="primary" variant="outlined" @click="resetView" block>Reset Camera</v-btn>
                         </v-col>
                     </v-row>
+                    <div class="text-caption mt-3 text-medium-emphasis">
+                        <v-icon size="small" class="mr-1">mdi-keyboard</v-icon>
+                        Use <b>W, A, S, D</b> to fly<br>
+                        <b>Q/E</b> for up/down, <b>Shift</b> for speed
+                    </div>
                 </div>
 
 
@@ -138,6 +143,23 @@ let hoveredInstanceId = -1;
 const originalColor = new THREE.Color();
 const highlightColor = new THREE.Color(0xffffff);
 const sharedMatrix = new THREE.Matrix4();
+
+const keys = { w: false, a: false, s: false, d: false, q: false, e: false, shift: false };
+
+function onKeyDown(event: KeyboardEvent) {
+    if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+    const key = event.key.toLowerCase();
+    if (key in keys) {
+        keys[key as keyof typeof keys] = true;
+    }
+}
+
+function onKeyUp(event: KeyboardEvent) {
+    const key = event.key.toLowerCase();
+    if (key in keys) {
+        keys[key as keyof typeof keys] = false;
+    }
+}
 
 function initThree() {
     if (!container.value) return;
@@ -348,6 +370,40 @@ function applyFilter() {
 function animate() {
     if (!renderer || !scene || !camera) return;
     requestAnimationFrame(animate);
+
+    if (keys.w || keys.a || keys.s || keys.d || keys.q || keys.e) {
+        const flySpeed = keys.shift ? 4.0 : 1.0;
+        const forward = new THREE.Vector3();
+        camera.getWorldDirection(forward);
+
+        const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
+
+        if (keys.w) {
+            camera.position.addScaledVector(forward, flySpeed);
+            controls?.target.addScaledVector(forward, flySpeed);
+        }
+        if (keys.s) {
+            camera.position.addScaledVector(forward, -flySpeed);
+            controls?.target.addScaledVector(forward, -flySpeed);
+        }
+        if (keys.a) {
+            camera.position.addScaledVector(right, -flySpeed);
+            controls?.target.addScaledVector(right, -flySpeed);
+        }
+        if (keys.d) {
+            camera.position.addScaledVector(right, flySpeed);
+            controls?.target.addScaledVector(right, flySpeed);
+        }
+        if (keys.q) {
+            camera.position.addScaledVector(camera.up, -flySpeed);
+            controls?.target.addScaledVector(camera.up, -flySpeed);
+        }
+        if (keys.e) {
+            camera.position.addScaledVector(camera.up, flySpeed);
+            controls?.target.addScaledVector(camera.up, flySpeed);
+        }
+    }
+
     controls?.update();
 
     raycaster.setFromCamera(mouse, camera);
@@ -461,11 +517,15 @@ onMounted(() => {
     renderLocations(locationData.value);
     window.addEventListener('resize', handleResize);
     window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
 });
 
 onBeforeUnmount(() => {
     window.removeEventListener('resize', handleResize);
     window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('keydown', onKeyDown);
+    window.removeEventListener('keyup', onKeyUp);
     renderer?.dispose();
 });
 </script>
