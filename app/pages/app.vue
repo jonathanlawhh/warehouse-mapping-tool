@@ -155,14 +155,12 @@ let camera: THREE.PerspectiveCamera | null = null;
 let renderer: THREE.WebGLRenderer | null = null;
 let controls: OrbitControls | null = null;
 let instancedMesh: THREE.InstancedMesh | null = null;
-let occupiedMesh: THREE.InstancedMesh | null = null;
 const instanceDataMap = new Map<number, any>();
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let hoveredInstanceId = -1;
 const originalColor = new THREE.Color();
 const highlightColor = new THREE.Color(0xffffff);
-const occupiedOColor = new THREE.Color(0xffffff);
 const sharedMatrix = new THREE.Matrix4();
 
 const keys = { w: false, a: false, s: false, d: false, q: false, e: false, shift: false };
@@ -231,13 +229,6 @@ function renderLocations(locations: any[]) {
         instancedMesh = null;
     }
 
-    if (occupiedMesh) {
-        scene.remove(occupiedMesh);
-        occupiedMesh.geometry.dispose();
-        (occupiedMesh.material as THREE.Material).dispose();
-        occupiedMesh = null;
-    }
-
     instanceDataMap.clear();
 
     if (locations.length === 0) return;
@@ -252,12 +243,6 @@ function renderLocations(locations: any[]) {
     });
 
     instancedMesh = new THREE.InstancedMesh(geometry, material, locations.length);
-
-    // Torus geometry for the "O"
-    const torusGeom = new THREE.TorusGeometry(0.35, 0.05, 8, 24);
-    const torusMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-    // We create 2 instances per location (Front and Back only for performance)
-    occupiedMesh = new THREE.InstancedMesh(torusGeom, torusMat, locations.length * 2);
 
     const dummy = new THREE.Object3D();
     const color = new THREE.Color();
@@ -276,18 +261,19 @@ function renderLocations(locations: any[]) {
         const c = data.y;
         const l = data.z;
 
+        const sx = data.size_x || 1;
+        const sy = data.size_y || 1;
+        const sz = data.size_z || 1;
+
         const xPos = (r - 1) * CONFIG.rackSpacing;
         const zPos = (c - 1) * compWidth;
-        const yPos = (CONFIG.boxSize.height / 2) + (l - 1) * levelHeight;
+        const yPos = (CONFIG.boxSize.height * sy / 2) + (l - 1) * levelHeight;
 
-        // Manual matrix composition (translation only, scale 1)
-        const te = sharedMatrix.elements;
-        te[0] = 1; te[4] = 0; te[8] = 0; te[12] = xPos;
-        te[1] = 0; te[5] = 1; te[9] = 0; te[13] = yPos;
-        te[2] = 0; te[6] = 0; te[10] = 1; te[14] = zPos;
-        te[3] = 0; te[7] = 0; te[11] = 0; te[15] = 1;
+        dummy.position.set(xPos, yPos, zPos);
+        dummy.scale.set(sx, sy, sz);
+        dummy.updateMatrix();
 
-        instancedMesh.setMatrixAt(i, sharedMatrix);
+        instancedMesh.setMatrixAt(i, dummy.matrix);
 
         const zoneInfo = getZoneColor(data.zone);
         data.colorHex = zoneInfo.colorHex;
@@ -302,44 +288,16 @@ function renderLocations(locations: any[]) {
         zoneSet.add(data.zone);
 
         instanceDataMap.set(i, data);
-
-        // Position for O circles on 2 sides (Front and Back)
-        if (data.occupied) {
-            // Front
-            dummy.position.set(xPos, yPos, zPos + CONFIG.boxSize.depth / 2 + 0.01);
-            dummy.rotation.set(0, 0, 0);
-            dummy.updateMatrix();
-            occupiedMesh.setMatrixAt(i * 2 + 0, dummy.matrix);
-
-            // Back
-            dummy.position.set(xPos, yPos, zPos - CONFIG.boxSize.depth / 2 - 0.01);
-            dummy.rotation.set(0, Math.PI, 0);
-            dummy.updateMatrix();
-            occupiedMesh.setMatrixAt(i * 2 + 1, dummy.matrix);
-        } else {
-            // Hide by scaling to 0
-            dummy.scale.set(0, 0, 0);
-            dummy.updateMatrix();
-            for (let side = 0; side < 2; side++) {
-                occupiedMesh.setMatrixAt(i * 2 + side, dummy.matrix);
-            }
-            dummy.scale.set(1, 1, 1);
-        }
     }
 
     const centerX = (minX + maxX) / 2;
     const centerZ = (minZ + maxZ) / 2;
     instancedMesh.position.x = -centerX;
     instancedMesh.position.z = -centerZ;
-    occupiedMesh.position.x = -centerX;
-    occupiedMesh.position.z = -centerZ;
 
     instancedMesh.instanceMatrix.needsUpdate = true;
     if (instancedMesh.instanceColor) instancedMesh.instanceColor.needsUpdate = true;
-    occupiedMesh.instanceMatrix.needsUpdate = true;
-
     scene.add(instancedMesh);
-    scene.add(occupiedMesh);
 
     maxLevels.value = maxL;
     availableZones.value = Array.from(zoneSet).sort();
@@ -417,50 +375,23 @@ function applyFilter() {
             count++;
             if (data.occupied) occupiedCount++;
             activeZones.add(data.zone);
+            const sx = data.size_x || 1;
+            const sy = data.size_y || 1;
+            const sz = data.size_z || 1;
+
             const xPos = (data.x - 1) * CONFIG.rackSpacing;
-            const yPos = boxHeightHalf + (data.z - 1) * levelHeight;
+            const yPos = (CONFIG.boxSize.height * sy / 2) + (data.z - 1) * levelHeight;
             const zPos = (data.y - 1) * compWidth;
 
-            te[0] = 1; te[4] = 0; te[8] = 0; te[12] = xPos;
-            te[1] = 0; te[5] = 1; te[9] = 0; te[13] = yPos;
-            te[2] = 0; te[6] = 0; te[10] = 1; te[14] = zPos;
-            te[3] = 0; te[7] = 0; te[11] = 0; te[15] = 1;
-            instancedMesh.setMatrixAt(i, sharedMatrix);
-
-            if (data.occupied) {
-                // Front
-                dummy.position.set(xPos, yPos, zPos + CONFIG.boxSize.depth / 2 + 0.01);
-                dummy.rotation.set(0, 0, 0);
-                dummy.updateMatrix();
-                occupiedMesh.setMatrixAt(i * 2 + 0, dummy.matrix);
-
-                // Back
-                dummy.position.set(xPos, yPos, zPos - CONFIG.boxSize.depth / 2 - 0.01);
-                dummy.rotation.set(0, Math.PI, 0);
-                dummy.updateMatrix();
-                occupiedMesh.setMatrixAt(i * 2 + 1, dummy.matrix);
-            } else {
-                dummy.scale.set(0, 0, 0);
-                dummy.updateMatrix();
-                for (let side = 0; side < 2; side++) {
-                    occupiedMesh.setMatrixAt(i * 2 + side, dummy.matrix);
-                }
-                dummy.scale.set(1, 1, 1);
-            }
+            dummy.position.set(xPos, yPos, zPos);
+            dummy.scale.set(sx, sy, sz);
+            dummy.updateMatrix();
+            instancedMesh.setMatrixAt(i, dummy.matrix);
         } else {
             // Set scale to 0
-            te[0] = 0; te[4] = 0; te[8] = 0; te[12] = 0;
-            te[1] = 0; te[5] = 0; te[9] = 0; te[13] = 0;
-            te[2] = 0; te[6] = 0; te[10] = 0; te[14] = 0;
-            te[3] = 0; te[7] = 0; te[11] = 0; te[15] = 1;
-            instancedMesh.setMatrixAt(i, sharedMatrix);
-
             dummy.scale.set(0, 0, 0);
             dummy.updateMatrix();
-            for (let side = 0; side < 2; side++) {
-                occupiedMesh.setMatrixAt(i * 2 + side, dummy.matrix);
-            }
-            dummy.scale.set(1, 1, 1);
+            instancedMesh.setMatrixAt(i, dummy.matrix);
         }
     }
     filteredCount.value = count;
@@ -468,7 +399,6 @@ function applyFilter() {
     filteredZoneCount.value = activeZones.size;
     availableZones.value = Array.from(zonesInLevel).sort();
     instancedMesh.instanceMatrix.needsUpdate = true;
-    occupiedMesh.instanceMatrix.needsUpdate = true;
 }
 
 function animate() {
@@ -577,7 +507,10 @@ function generateMockData() {
                     x: x, y: y, z: z,
                     zone: `${zoneType}_${x}`,
                     name: `LOC-${x.toString().padStart(2, '0')}-${y.toString().padStart(2, '0')}-${z}`,
-                    occupied: Math.random() > 0.8
+                    occupied: Math.random() > 0.8,
+                    size_x: Math.random() > 0.9 ? 1.5 : 1,
+                    size_y: Math.random() > 0.9 ? 2.0 : 1,
+                    size_z: Math.random() > 0.9 ? 1.2 : 1
                 });
             }
         }
@@ -607,7 +540,10 @@ function handleCSVUpload(event: any) {
                 z: parseInt(vals[colMap['z'] || 2]) || 0,
                 zone: String(vals[colMap['zone'] || 3]).toUpperCase().replaceAll('"', "").trim(),
                 name: String(vals[colMap['name'] || 4]).toUpperCase().replaceAll('"', "").trim(),
-                occupied: occupiedVal === 'true' || occupiedVal === '1' || occupiedVal === 'yes'
+                occupied: occupiedVal === 'true' || occupiedVal === '1' || occupiedVal === 'yes',
+                size_x: parseInt(vals[colMap['size_x'] || 5]) || 1,
+                size_y: parseInt(vals[colMap['size_y'] || 6]) || 1,
+                size_z: parseInt(vals[colMap['size_z'] || 7]) || 1,
             });
         }
         if (results.length > 0) {
