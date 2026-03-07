@@ -7,8 +7,8 @@
                     <v-col cols="12" md="6" class="justify-center">
                         <div>
                             <h1 class="text-h2 font-weight-black mb-6 line-height-1 shadow-glow">
-                                Warehouse Mapping<br>
-                                <span class="text-primary">Tool</span>
+                                Warehouse<br>
+                                <span class="text-primary">Tools</span>
 
                             </h1>
                             <p class="text-h6 text-medium-emphasis mb-8">
@@ -16,9 +16,13 @@
                                 probably this tool is not for you.
                             </p>
                             <div class="d-flex flex-wrap gap-4 justify-center">
-                                <v-btn color="primary" to="/app" rounded="xl" elevation="8" size="x-large"
-                                    class="px-8 text-none font-weight-bold" append-icon="mdi-arrow-right">
-                                    Launch App
+                                <v-btn color="primary" to="/mapping" rounded="xl" elevation="8" size="x-large"
+                                    class="px-8 text-none font-weight-bold ma-4" append-icon="mdi-arrow-right">
+                                    Mapping Visualization
+                                </v-btn>
+                                <v-btn color="secondary" to="/equ" rounded="xl" elevation="8" size="x-large"
+                                    class="px-8 text-none font-weight-bold ma-4" append-icon="mdi-arrow-right">
+                                    Equipment Utilization Training
                                 </v-btn>
                             </div>
 
@@ -133,7 +137,7 @@
 
 <script setup lang="ts">
 useHead({
-    title: 'Warehouse Mapping Tool'
+    title: 'Warehouse Tools'
 })
 </script>
 

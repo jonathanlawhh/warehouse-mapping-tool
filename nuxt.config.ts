@@ -32,7 +32,7 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
-      title: 'Warehouse Mapping Tool',
+      title: 'Warehouse Tools',
       meta: [
         { name: 'description', content: 'Warehouse digital twin. Visualize storage mapping. If you still do not understand, most probably this tool is not for you.' }
       ],

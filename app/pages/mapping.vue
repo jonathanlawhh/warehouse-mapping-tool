@@ -7,6 +7,9 @@
                 <v-btn block variant="flat" color="primary" to="/" prepend-icon="mdi-home" rounded="lg" class="mt-4">
                     Main Page
                 </v-btn>
+                <v-btn block variant="flat" color="secondary" to="/equ" prepend-icon="mdi-forklift" rounded="lg" class="mt-2">
+                    Equipment Utilization
+                </v-btn>
 
                 <div class="mb-6 mt-16">
                     <div class="text-overline mb-2">Import Layout</div>
@@ -118,7 +121,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { onMounted, onBeforeUnmount, ref, reactive, shallowRef } from 'vue';
 
 useHead({
-    title: 'App | Warehouse Mapping Tool'
+    title: 'Mapping | Warehouse Mapping Tool'
 });
 
 const CONFIG = {
