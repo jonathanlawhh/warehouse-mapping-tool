@@ -158,14 +158,12 @@ let camera: THREE.PerspectiveCamera | null = null;
 let renderer: THREE.WebGLRenderer | null = null;
 let controls: OrbitControls | null = null;
 let instancedMesh: THREE.InstancedMesh | null = null;
-let occupiedMesh: THREE.InstancedMesh | null = null;
 const instanceDataMap = new Map<number, any>();
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let hoveredInstanceId = -1;
 const originalColor = new THREE.Color();
 const highlightColor = new THREE.Color(0xffffff);
-const occupiedOColor = new THREE.Color(0xffffff);
 const sharedMatrix = new THREE.Matrix4();
 
 const keys = { w: false, a: false, s: false, d: false, q: false, e: false, shift: false };
@@ -234,12 +232,7 @@ function renderLocations(locations: any[]) {
         instancedMesh = null;
     }
 
-    if (occupiedMesh) {
-        scene.remove(occupiedMesh);
-        occupiedMesh.geometry.dispose();
-        (occupiedMesh.material as THREE.Material).dispose();
-        occupiedMesh = null;
-    }
+
 
     instanceDataMap.clear();
 
@@ -256,13 +249,7 @@ function renderLocations(locations: any[]) {
 
     instancedMesh = new THREE.InstancedMesh(geometry, material, locations.length);
 
-    // Torus geometry for the "O"
-    const torusGeom = new THREE.TorusGeometry(0.35, 0.05, 8, 24);
-    const torusMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-    // We create 2 instances per location (Front and Back only for performance)
-    occupiedMesh = new THREE.InstancedMesh(torusGeom, torusMat, locations.length * 2);
 
-    const dummy = new THREE.Object3D();
     const color = new THREE.Color();
 
     const compWidth = CONFIG.boxSize.depth + CONFIG.gapBetweenCompartments;
@@ -306,43 +293,17 @@ function renderLocations(locations: any[]) {
 
         instanceDataMap.set(i, data);
 
-        // Position for O circles on 2 sides (Front and Back)
-        if (data.occupied) {
-            // Front
-            dummy.position.set(xPos, yPos, zPos + CONFIG.boxSize.depth / 2 + 0.01);
-            dummy.rotation.set(0, 0, 0);
-            dummy.updateMatrix();
-            occupiedMesh.setMatrixAt(i * 2 + 0, dummy.matrix);
 
-            // Back
-            dummy.position.set(xPos, yPos, zPos - CONFIG.boxSize.depth / 2 - 0.01);
-            dummy.rotation.set(0, Math.PI, 0);
-            dummy.updateMatrix();
-            occupiedMesh.setMatrixAt(i * 2 + 1, dummy.matrix);
-        } else {
-            // Hide by scaling to 0
-            dummy.scale.set(0, 0, 0);
-            dummy.updateMatrix();
-            for (let side = 0; side < 2; side++) {
-                occupiedMesh.setMatrixAt(i * 2 + side, dummy.matrix);
-            }
-            dummy.scale.set(1, 1, 1);
-        }
     }
 
     const centerX = (minX + maxX) / 2;
     const centerZ = (minZ + maxZ) / 2;
     instancedMesh.position.x = -centerX;
     instancedMesh.position.z = -centerZ;
-    occupiedMesh.position.x = -centerX;
-    occupiedMesh.position.z = -centerZ;
 
     instancedMesh.instanceMatrix.needsUpdate = true;
     if (instancedMesh.instanceColor) instancedMesh.instanceColor.needsUpdate = true;
-    occupiedMesh.instanceMatrix.needsUpdate = true;
-
     scene.add(instancedMesh);
-    scene.add(occupiedMesh);
 
     maxLevels.value = maxL;
     availableZones.value = Array.from(zoneSet).sort();
@@ -399,7 +360,6 @@ function applyFilter() {
     const total = dataList.length;
 
     const te = sharedMatrix.elements;
-    const dummy = new THREE.Object3D();
 
     for (let i = 0; i < total; i++) {
         const data = dataList[i];
@@ -430,26 +390,7 @@ function applyFilter() {
             te[3] = 0; te[7] = 0; te[11] = 0; te[15] = 1;
             instancedMesh.setMatrixAt(i, sharedMatrix);
 
-            if (data.occupied) {
-                // Front
-                dummy.position.set(xPos, yPos, zPos + CONFIG.boxSize.depth / 2 + 0.01);
-                dummy.rotation.set(0, 0, 0);
-                dummy.updateMatrix();
-                occupiedMesh.setMatrixAt(i * 2 + 0, dummy.matrix);
 
-                // Back
-                dummy.position.set(xPos, yPos, zPos - CONFIG.boxSize.depth / 2 - 0.01);
-                dummy.rotation.set(0, Math.PI, 0);
-                dummy.updateMatrix();
-                occupiedMesh.setMatrixAt(i * 2 + 1, dummy.matrix);
-            } else {
-                dummy.scale.set(0, 0, 0);
-                dummy.updateMatrix();
-                for (let side = 0; side < 2; side++) {
-                    occupiedMesh.setMatrixAt(i * 2 + side, dummy.matrix);
-                }
-                dummy.scale.set(1, 1, 1);
-            }
         } else {
             // Set scale to 0
             te[0] = 0; te[4] = 0; te[8] = 0; te[12] = 0;
@@ -458,12 +399,7 @@ function applyFilter() {
             te[3] = 0; te[7] = 0; te[11] = 0; te[15] = 1;
             instancedMesh.setMatrixAt(i, sharedMatrix);
 
-            dummy.scale.set(0, 0, 0);
-            dummy.updateMatrix();
-            for (let side = 0; side < 2; side++) {
-                occupiedMesh.setMatrixAt(i * 2 + side, dummy.matrix);
-            }
-            dummy.scale.set(1, 1, 1);
+
         }
     }
     filteredCount.value = count;
@@ -471,7 +407,6 @@ function applyFilter() {
     filteredZoneCount.value = activeZones.size;
     availableZones.value = Array.from(zonesInLevel).sort();
     instancedMesh.instanceMatrix.needsUpdate = true;
-    occupiedMesh.instanceMatrix.needsUpdate = true;
 }
 
 function animate() {
