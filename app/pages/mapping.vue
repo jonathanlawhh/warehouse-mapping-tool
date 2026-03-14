@@ -1,16 +1,8 @@
 <template>
     <div>
         <!-- Navigation Drawer for Controls -->
-        <v-navigation-drawer v-model="drawer" location="left" permanent width="320" class="bg-surface-light border-r"
-            elevation="0">
-            <div class="pa-4">
-                <v-btn block variant="flat" color="primary" to="/" prepend-icon="mdi-home" rounded="lg" class="mt-4">
-                    Main Page
-                </v-btn>
-                <v-btn block variant="flat" color="secondary" to="/equ" prepend-icon="mdi-forklift" rounded="lg" class="mt-2">
-                    Equipment Utilization
-                </v-btn>
-
+        <AppSidebar app-link="/equ" app-icon="mdi-forklift">
+            <template #default>
                 <div class="mb-6 mt-16">
                     <div class="text-overline mb-2">Import Layout</div>
                     <v-file-input label="Upload CSV File" prepend-icon="mdi-file-upload" accept=".csv"
@@ -82,19 +74,24 @@
                             <v-btn color="primary" variant="outlined" @click="resetView" block>Reset Camera</v-btn>
                         </v-col>
                     </v-row>
-                    <div class="text-caption mt-3 text-medium-emphasis">
-                        <v-icon size="small" class="mr-1">mdi-keyboard</v-icon>
-                        Use <b>W, A, S, D</b> to fly<br>
-                        <b>Q/E</b> for up/down, <b>Shift</b> for speed
-                    </div>
                 </div>
 
 
-            </div>
-        </v-navigation-drawer>
+            </template>
+        </AppSidebar>
 
         <!-- Main Content (3D Canvas) -->
         <v-main class="bg-black pa-0">
+            <AppOverlay position="bottom" padding="pa-3">
+                <div class="d-flex align-center">
+                    <v-icon color="info" class="mr-2">mdi-information</v-icon>
+                    <div class="text-body-2">
+                        Use <v-chip size="x-small">W, A, S, D</v-chip> to fly.
+                        Use <v-chip size="x-small">Q/E</v-chip> for up/down, <v-chip size="x-small">Shift</v-chip> for
+                        speed
+                    </div>
+                </div>
+            </AppOverlay>
             <div ref="container" class="canvas-container">
                 <!-- Tooltip Overlay -->
                 <div v-if="hoveredData" class="custom-tooltip" :style="{
@@ -139,7 +136,6 @@ const CONFIG = {
     rackSpacing: 8
 };
 
-const drawer = ref(true);
 const levelFilter = ref(0);
 const zoneFilter = ref<string[]>([]);
 const occupiedFilter = ref('all');

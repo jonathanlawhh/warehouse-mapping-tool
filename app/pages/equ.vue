@@ -1,17 +1,8 @@
 <template>
     <div>
         <!-- Navigation Drawer for Controls -->
-        <v-navigation-drawer v-model="drawer" location="left" permanent width="320" class="bg-surface-light border-r"
-            elevation="0">
-            <div class="pa-4">
-                <v-btn block variant="flat" color="primary" to="/" prepend-icon="mdi-home" rounded="lg" class="mt-4">
-                    Main Page
-                </v-btn>
-                <v-btn block variant="flat" color="secondary" to="/mapping" prepend-icon="mdi-map" rounded="lg"
-                    class="mt-2">
-                    Warehouse Mapping
-                </v-btn>
-
+        <AppSidebar app-link="/mapping" app-icon="mdi-map">
+            <template #default>
                 <div class="mb-6 mt-8">
                     <div class="text-overline mb-2">Inventory</div>
                     <div class="text-caption text-medium-emphasis mb-2">Select goods to load</div>
@@ -50,15 +41,14 @@
                         </v-col>
                     </v-row>
                 </div>
-            </div>
-        </v-navigation-drawer>
+            </template>
+        </AppSidebar>
 
         <!-- Main Content (3D Canvas) -->
         <v-main class="bg-black pa-0">
 
             <!-- Floating Header Stats -->
-            <v-card class="position-absolute ma-4 pa-4 glass-card"
-                style="z-index: 10; top: 0; left: 340px; min-width: 400px; background: rgba(15, 23, 42, 0.8) !important; backdrop-filter: blur(10px);">
+            <AppOverlay position="top" padding="pa-4" style="min-width: 400px;">
                 <div class="d-flex justify-space-between align-center">
                     <div class="stat-item text-center">
                         <div class="text-caption text-medium-emphasis">Total Volume</div>
@@ -79,18 +69,17 @@
                             rounded></v-progress-linear>
                     </div>
                 </div>
-            </v-card>
+            </AppOverlay>
 
             <!-- Instructions Toast -->
-            <v-card class="position-absolute ma-4 pa-3 glass-card"
-                style="z-index: 10; bottom: 0; left: 340px; background: rgba(15, 23, 42, 0.8) !important; backdrop-filter: blur(10px);">
+            <AppOverlay position="bottom" padding="pa-3">
                 <div class="d-flex align-center">
                     <v-icon color="info" class="mr-2">mdi-information</v-icon>
                     <div class="text-body-2">Select a good and press <v-chip size="x-small">E</v-chip> to place. Press
                         <v-chip size="x-small">R</v-chip> to rotate. Use <v-chip size="x-small">WASD</v-chip> to fly.
                     </div>
                 </div>
-            </v-card>
+            </AppOverlay>
 
             <div ref="container" class="canvas-container"></div>
 
@@ -139,7 +128,6 @@ useHead({
     title: 'Equipment Utilization | Warehouse Mapping Tool'
 });
 
-const drawer = ref(true);
 const container = ref(null);
 const completionModal = ref(false);
 
