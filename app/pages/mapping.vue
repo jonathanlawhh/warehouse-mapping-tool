@@ -8,7 +8,7 @@
                     <v-file-input label="Upload CSV File" prepend-icon="mdi-file-upload" accept=".csv"
                         variant="outlined" density="compact" hide-details @change="handleCSVUpload"></v-file-input>
                     <div class="text-caption mt-1 text-medium-emphasis">
-                        Format: x, y, z, zone, name, occupied
+                        Format: x, y, z, zone, name, occupied, size_x, size_y, size_z
                     </div>
                 </div>
 
@@ -122,7 +122,7 @@ useHead({
 });
 
 const CONFIG = {
-    boxSize: { width: 1.0, height: 1.0, depth: 1.2 },
+    boxSize: { width: 1.0, height: 1.0, depth: 1.0 },
     gapBetweenRacks: 1,
     gapBetweenCompartments: 0.4,
     gapBetweenLevels: 0.2,
@@ -154,6 +154,7 @@ let camera: THREE.PerspectiveCamera | null = null;
 let renderer: THREE.WebGLRenderer | null = null;
 let controls: OrbitControls | null = null;
 let instancedMesh: THREE.InstancedMesh | null = null;
+let floor: THREE.Mesh | null = null;
 const instanceDataMap = new Map<number, any>();
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -206,11 +207,11 @@ function initThree() {
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
     scene.add(ambientLight);
 
-    const floorGeometry = new THREE.PlaneGeometry(1000, 400);
+    const floorGeometry = new THREE.PlaneGeometry(100, 100);
     const floorMaterial = new THREE.MeshStandardMaterial({
         color: CONFIG.colors.floor
     });
-    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -0.05;
     scene.add(floor);
@@ -266,11 +267,19 @@ function renderLocations(locations: any[]) {
         const zPos = (c - 1) * compWidth;
         const yPos = (CONFIG.boxSize.height / 2) + (l - 1) * levelHeight;
 
-        // Manual matrix composition (translation only, scale 1)
+        const scaleX = data.size_x || 1;
+        const scaleY = data.size_y || 1;
+        const scaleZ = data.size_z || 1;
+
+        const adjustedX = xPos + (scaleX - 1) * (CONFIG.boxSize.width / 2);
+        const adjustedY = yPos + (scaleY - 1) * (CONFIG.boxSize.height / 2);
+        const adjustedZ = zPos + (scaleZ - 1) * (CONFIG.boxSize.depth / 2);
+
+        // Manual matrix composition (translation and scale)
         const te = sharedMatrix.elements;
-        te[0] = 1; te[4] = 0; te[8] = 0; te[12] = xPos;
-        te[1] = 0; te[5] = 1; te[9] = 0; te[13] = yPos;
-        te[2] = 0; te[6] = 0; te[10] = 1; te[14] = zPos;
+        te[0] = scaleX; te[4] = 0; te[8] = 0; te[12] = adjustedX;
+        te[1] = 0; te[5] = scaleY; te[9] = 0; te[13] = adjustedY;
+        te[2] = 0; te[6] = 0; te[10] = scaleZ; te[14] = adjustedZ;
         te[3] = 0; te[7] = 0; te[11] = 0; te[15] = 1;
 
         instancedMesh.setMatrixAt(i, sharedMatrix);
@@ -300,6 +309,17 @@ function renderLocations(locations: any[]) {
     instancedMesh.instanceMatrix.needsUpdate = true;
     if (instancedMesh.instanceColor) instancedMesh.instanceColor.needsUpdate = true;
     scene.add(instancedMesh);
+
+    if (floor) {
+        const spanX = (maxX !== -Infinity && minX !== Infinity) ? (maxX - minX) : 0;
+        const spanZ = (maxZ !== -Infinity && minZ !== Infinity) ? (maxZ - minZ) : 0;
+
+        const floorWidth = Math.max(100, spanX + 150);
+        const floorDepth = Math.max(100, spanZ + 150);
+
+        floor.geometry.dispose();
+        floor.geometry = new THREE.PlaneGeometry(floorWidth, floorDepth);
+    }
 
     maxLevels.value = maxL;
     availableZones.value = Array.from(zoneSet).sort();
@@ -380,9 +400,17 @@ function applyFilter() {
             const yPos = boxHeightHalf + (data.z - 1) * levelHeight;
             const zPos = (data.y - 1) * compWidth;
 
-            te[0] = 1; te[4] = 0; te[8] = 0; te[12] = xPos;
-            te[1] = 0; te[5] = 1; te[9] = 0; te[13] = yPos;
-            te[2] = 0; te[6] = 0; te[10] = 1; te[14] = zPos;
+            const scaleX = data.size_x || 1;
+            const scaleY = data.size_y || 1;
+            const scaleZ = data.size_z || 1;
+
+            const adjustedX = xPos + (scaleX - 1) * (CONFIG.boxSize.width / 2);
+            const adjustedY = yPos + (scaleY - 1) * (CONFIG.boxSize.height / 2);
+            const adjustedZ = zPos + (scaleZ - 1) * (CONFIG.boxSize.depth / 2);
+
+            te[0] = scaleX; te[4] = 0; te[8] = 0; te[12] = adjustedX;
+            te[1] = 0; te[5] = scaleY; te[9] = 0; te[13] = adjustedY;
+            te[2] = 0; te[6] = 0; te[10] = scaleZ; te[14] = adjustedZ;
             te[3] = 0; te[7] = 0; te[11] = 0; te[15] = 1;
             instancedMesh.setMatrixAt(i, sharedMatrix);
 
@@ -511,7 +539,10 @@ function generateMockData() {
                     x: x, y: y, z: z,
                     zone: `${zoneType}_${x}`,
                     name: `LOC-${x.toString().padStart(2, '0')}-${y.toString().padStart(2, '0')}-${z}`,
-                    occupied: Math.random() > 0.8
+                    occupied: Math.random() > 0.8,
+                    size_x: 1,
+                    size_y: 1,
+                    size_z: 1
                 });
             }
         }
@@ -541,7 +572,10 @@ function handleCSVUpload(event: any) {
                 z: parseInt(vals[colMap['z'] || 2]) || 0,
                 zone: String(vals[colMap['zone'] || 3]).toUpperCase().replaceAll('"', "").trim(),
                 name: String(vals[colMap['name'] || 4]).toUpperCase().replaceAll('"', "").trim(),
-                occupied: occupiedVal === 'true' || occupiedVal === '1' || occupiedVal === 'yes'
+                occupied: occupiedVal === 'true' || occupiedVal === '1' || occupiedVal === 'yes',
+                size_x: parseInt(vals[colMap['size_x']]) || 1,
+                size_y: parseInt(vals[colMap['size_y']]) || 1,
+                size_z: parseInt(vals[colMap['size_z']]) || 1
             });
         }
         if (results.length > 0) {

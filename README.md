@@ -8,7 +8,8 @@ A high-performance, interactive 3D warehouse visualization and layout planning t
 ## ✨ Features
 
 -   **⚡ High-Performance Rendering**: Uses `InstancedMesh` to render 10,000+ storage locations at 60 FPS.
--   **📁 Dynamic Layout Import**: Upload CSV files (`x, y, z, zone, name`) to instantly generate complex warehouse maps.
+-   **📁 Dynamic Layout Import**: Upload CSV files (`x, y, z, zone, name, occupied, size_x, size_y, size_z`) to instantly generate complex warehouse maps.
+-   **📏 Adaptive Environment**: The 3D floor geometry automatically resizes based on the maximum dimensions of your uploaded layout data.
 -   **🔍 Filtering**: 
     -   **Level**: Isolate specific vertical tiers of the rack system.
     -   **Zone**: Focus on specific operational areas (e.g., Picking, Storage, Overflow).
@@ -50,6 +51,10 @@ To import your own warehouse data, use a CSV file with the following headers:
 | `z` | Level ID / Z-Coordinate | Integer |
 | `zone` | Functional area name (e.g. `PICKING_01`) | String |
 | `name` | Location label (e.g. `LOC-01-05-02`) | String |
+| `occupied` | Whether the location is occupied (`true`/`false`) | Boolean |
+| `size_x` | Width scaling factor for the box (optional, default: `1`) | Integer |
+| `size_y` | Height scaling factor for the box (optional, default: `1`) | Integer |
+| `size_z` | Depth scaling factor for the box (optional, default: `1`) | Integer |
 
 ## 🛠️ Tech Stack
 
