@@ -10,6 +10,11 @@
                     <div class="text-caption mt-1 text-medium-emphasis">
                         Format: x, y, z, zone, name, occupied, size_x, size_y, size_z
                     </div>
+                    <v-btn href="/template/mapping_template.csv" download target="_blank"
+                        variant="text" size="small" color="primary" class="mt-2 px-0 font-weight-bold"
+                        prepend-icon="mdi-download">
+                        Download Template
+                    </v-btn>
                 </div>
 
                 <v-divider class="mb-6"></v-divider>
