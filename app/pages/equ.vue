@@ -3,7 +3,23 @@
         <!-- Navigation Drawer for Controls -->
         <AppSidebar app-link="/mapping" app-icon="mdi-map">
             <template #default>
-                <div class="mb-6 mt-8">
+                <div class="mb-6 mt-16">
+                    <div class="text-overline mb-2">Import Goods</div>
+                    <v-file-input label="Upload CSV File" prepend-icon="mdi-file-upload" accept=".csv"
+                        variant="outlined" density="compact" hide-details @change="handleCSVUpload"></v-file-input>
+                    <div class="text-caption mt-1 text-medium-emphasis">
+                        Format: id, name, length, width, height, weight, color
+                    </div>
+                    <v-btn href="/template/equ_template.csv" download target="_blank"
+                        variant="text" size="small" color="primary" class="mt-2 px-0 font-weight-bold"
+                        prepend-icon="mdi-download">
+                        Download Template
+                    </v-btn>
+                </div>
+
+                <v-divider class="mb-6"></v-divider>
+
+                <div class="mb-6">
                     <div class="text-overline mb-2">Inventory</div>
                     <div class="text-caption text-medium-emphasis mb-2">Select goods to load</div>
 
@@ -216,13 +232,53 @@ function createContainer() {
     scene.add(floor);
 }
 
+let currentGoods = [...INITIAL_GOODS];
+
+function handleCSVUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const text = e.target.result;
+        const lines = text.trim().split('\n');
+        if (lines.length < 2) return;
+        const results = [];
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const colMap = {};
+        headers.forEach((h, i) => colMap[h] = i);
+        for (let i = 1; i < lines.length; i++) {
+            const vals = lines[i].split(',');
+            if (vals.length < 5) continue;
+            results.push({
+                id: String(vals[colMap['id'] || 0]).trim(),
+                name: String(vals[colMap['name'] || 1]).trim(),
+                length: parseInt(vals[colMap['length'] || 2]) || 0,
+                width: parseInt(vals[colMap['width'] || 3]) || 0,
+                height: parseInt(vals[colMap['height'] || 4]) || 0,
+                weight: parseInt(vals[colMap['weight'] || 5]) || 0,
+                color: String(vals[colMap['color'] || 6]).trim() || '#ffffff'
+            });
+        }
+        if (results.length > 0) {
+            currentGoods = results;
+            resetLoader();
+            initInventory();
+            createSamples();
+        }
+    };
+    reader.readAsText(file);
+}
+
 function initInventory() {
-    inventoryGoods.value = INITIAL_GOODS.map((g, i) => ({ ...g, index: i, hidden: false }));
+    inventoryGoods.value = currentGoods.map((g, i) => ({ ...g, index: i, hidden: false }));
 }
 
 function createSamples() {
+    sampleMeshes.forEach(m => scene.remove(m));
+    sampleMeshes.length = 0;
+
     const s = CONFIG.scale;
-    INITIAL_GOODS.forEach((good, index) => {
+    currentGoods.forEach((good, index) => {
         const geo = new THREE.BoxGeometry(good.length * s, good.height * s, good.width * s);
         const mat = new THREE.MeshPhongMaterial({ color: good.color, transparent: true, opacity: 0.6 });
         const mesh = new THREE.Mesh(geo, mat);
