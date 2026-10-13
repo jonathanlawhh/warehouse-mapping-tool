@@ -68,6 +68,11 @@
                         <v-radio label="Occupied Only" value="occupied" color="error"></v-radio>
                         <v-radio label="Empty Only" value="empty" color="success"></v-radio>
                     </v-radio-group>
+
+                    <v-divider class="my-3"></v-divider>
+
+                    <v-switch v-model="visualizeOccupied" color="primary" density="compact" class="px-2"
+                        label="Visualize Occupied" hide-details @update:model-value="updateColors"></v-switch>
                 </div>
 
                 <v-divider class="mb-6"></v-divider>
@@ -142,11 +147,10 @@ const CONFIG = {
     gapBetweenCompartments: 0.4,
     gapBetweenLevels: 0.2,
     colors: {
-        background: 0x020617,
+        background: 0x0f172a, // Rich modern tech slate navy
         box: 0x1e293b,
-        boxEdge: 0x3b82f6,
-        floor: '#676767',
-        grid: 0x1e293b,
+        boxEdge: 0x38bdf8,
+        floor: 0x1e293b,     // Clean matte studio floor
     },
     rackSpacing: 8
 };
@@ -154,6 +158,7 @@ const CONFIG = {
 const levelFilter = ref(0);
 const zoneFilter = ref<string[]>([]);
 const occupiedFilter = ref('all');
+const visualizeOccupied = ref(false);
 const maxLevels = ref(1);
 const availableZones = ref<string[]>([]);
 const locationData = shallowRef<any[]>([]);
@@ -218,9 +223,10 @@ function initThree() {
     camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
     camera.position.set(15, 90, 150);
 
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
     renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.shadowMap.enabled = false;
     container.value.appendChild(renderer.domElement);
 
     controls = new OrbitControls(camera, renderer.domElement);
@@ -230,11 +236,26 @@ function initThree() {
     controls.maxDistance = 600;
     controls.maxPolarAngle = Math.PI / 2 - 0.05;
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    // Uniform studio illumination (zero shadow, zero specular flare)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
     scene.add(ambientLight);
 
-    const floorGeometry = new THREE.PlaneGeometry(100, 100);
-    const floorMaterial = new THREE.MeshStandardMaterial({
+    const hemiLight = new THREE.HemisphereLight(0xe2e8f0, 0x1e293b, 1.1);
+    scene.add(hemiLight);
+
+    const keyLight = new THREE.DirectionalLight(0xffffff, 0.7);
+    keyLight.position.set(60, 120, 80);
+    keyLight.castShadow = false;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xe2e8f0, 0.5);
+    fillLight.position.set(-60, 80, -60);
+    fillLight.castShadow = false;
+    scene.add(fillLight);
+
+    // Completely matte, non-reflective floor with NO grid
+    const floorGeometry = new THREE.PlaneGeometry(160, 160);
+    const floorMaterial = new THREE.MeshBasicMaterial({
         color: CONFIG.colors.floor
     });
     floor = new THREE.Mesh(floorGeometry, floorMaterial);
@@ -257,8 +278,6 @@ function renderLocations(locations: any[]) {
         instancedMesh = null;
     }
 
-
-
     instanceDataMap.clear();
 
     if (locations.length === 0) return;
@@ -268,12 +287,13 @@ function renderLocations(locations: any[]) {
         CONFIG.boxSize.height,
         CONFIG.boxSize.depth
     );
-    const material = new THREE.MeshStandardMaterial({
-        color: 0xffffff
+    // Crisp, bright matte material without specular reflections
+    const material = new THREE.MeshLambertMaterial({
+        color: 0xffffff,
+        reflectivity: 0
     });
 
     instancedMesh = new THREE.InstancedMesh(geometry, material, locations.length);
-
 
     const color = new THREE.Color();
 
@@ -312,7 +332,7 @@ function renderLocations(locations: any[]) {
 
         instancedMesh.setMatrixAt(i, sharedMatrix);
 
-        const zoneInfo = getZoneColor(data.zone);
+        const zoneInfo = getZoneColor(data.zone, data.occupied);
         data.colorHex = zoneInfo.colorHex;
         color.setHex(zoneInfo.hex);
         instancedMesh.setColorAt(i, color);
@@ -325,8 +345,6 @@ function renderLocations(locations: any[]) {
         zoneSet.add(data.zone);
 
         instanceDataMap.set(i, data);
-
-
     }
 
     const centerX = (minX + maxX) / 2;
@@ -338,12 +356,12 @@ function renderLocations(locations: any[]) {
     if (instancedMesh.instanceColor) instancedMesh.instanceColor.needsUpdate = true;
     scene.add(instancedMesh);
 
-    if (floor) {
+    if (floor && scene) {
         const spanX = (maxX !== -Infinity && minX !== Infinity) ? (maxX - minX) : 0;
         const spanZ = (maxZ !== -Infinity && minZ !== Infinity) ? (maxZ - minZ) : 0;
 
-        const floorWidth = Math.max(100, spanX + 150);
-        const floorDepth = Math.max(100, spanZ + 150);
+        const floorWidth = Math.max(160, spanX + 160);
+        const floorDepth = Math.max(160, spanZ + 160);
 
         floor.geometry.dispose();
         floor.geometry = new THREE.PlaneGeometry(floorWidth, floorDepth);
@@ -452,20 +470,46 @@ function resetView() {
 }
 
 const zoneColorCache = new Map<string, { hex: number, colorHex: string }>();
-function getZoneColor(zoneName: string): { hex: number, colorHex: string } {
+function getZoneColor(zoneName: string, isOccupied = false): { hex: number, colorHex: string } {
+    const isDarkened = visualizeOccupied.value && isOccupied;
+    const cacheKey = `${zoneName}_${isDarkened ? 'occ' : 'default'}`;
     if (!zoneName) return { hex: 0x64748b, colorHex: '#64748b' };
-    const cached = zoneColorCache.get(zoneName);
+    const cached = zoneColorCache.get(cacheKey);
     if (cached) return cached;
 
     let hash = 0;
     for (let i = 0; i < zoneName.length; i++) {
         hash = zoneName.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const color = new THREE.Color(`hsl(${Math.abs(hash % 360)}, 70%, 50%)`);
+    const hue = Math.abs(hash % 360);
+    // When visualizeOccupied is ON and occupied: darker tone (34% lightness, 90% saturation). Default: bright zone color (58% lightness, 80% saturation)
+    const lightness = isDarkened ? 34 : 58;
+    const saturation = isDarkened ? 90 : 80;
+    const color = new THREE.Color(`hsl(${hue}, ${saturation}%, ${lightness}%)`);
     const hex = color.getHex();
     const result = { hex, colorHex: '#' + color.getHexString() };
-    zoneColorCache.set(zoneName, result);
+    zoneColorCache.set(cacheKey, result);
     return result;
+}
+
+function updateColors() {
+    if (!instancedMesh) return;
+    const color = new THREE.Color();
+    const total = locationData.value.length;
+
+    for (let i = 0; i < total; i++) {
+        const data = instanceDataMap.get(i);
+        if (!data) continue;
+        const zoneInfo = getZoneColor(data.zone, data.occupied);
+        data.colorHex = zoneInfo.colorHex;
+        if (i !== hoveredInstanceId) {
+            color.setHex(zoneInfo.hex);
+            instancedMesh.setColorAt(i, color);
+        }
+    }
+    if (instancedMesh.instanceColor) {
+        instancedMesh.instanceColor.needsUpdate = true;
+    }
 }
 
 function applyFilter() {
@@ -523,8 +567,6 @@ function applyFilter() {
             te[2] = 0; te[6] = 0; te[10] = scaleZ; te[14] = adjustedZ;
             te[3] = 0; te[7] = 0; te[11] = 0; te[15] = 1;
             instancedMesh.setMatrixAt(i, sharedMatrix);
-
-
         } else {
             // Set scale to 0
             te[0] = 0; te[4] = 0; te[8] = 0; te[12] = 0;
@@ -532,8 +574,6 @@ function applyFilter() {
             te[2] = 0; te[6] = 0; te[10] = 0; te[14] = 0;
             te[3] = 0; te[7] = 0; te[11] = 0; te[15] = 1;
             instancedMesh.setMatrixAt(i, sharedMatrix);
-
-
         }
     }
     filteredCount.value = count;
