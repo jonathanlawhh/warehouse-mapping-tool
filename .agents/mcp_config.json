@@ -1,0 +1,14 @@
+{
+    "mcpServers": {
+        "nuxt": {
+            "serverUrl": "https://nuxt.com/mcp",
+            "disabledTools": [
+                "list-deploy-providers",
+                "get-deploy-provider"
+            ]
+        },
+        "vuetify-mcp": {
+            "serverUrl": "https://mcp.vuetifyjs.com/mcp"
+        }
+    }
+}
