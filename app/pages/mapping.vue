@@ -75,6 +75,16 @@
                 <div class="mb-6">
                     <div class="text-overline mb-2">Controls</div>
                     <v-row dense>
+                        <v-col cols="12" class="mb-2" v-if="selectedData">
+                            <v-card variant="tonal" color="info" class="pa-2">
+                                <div class="text-caption text-medium-emphasis">Anchored Block</div>
+                                <div class="text-body-2 font-weight-bold">{{ selectedData.name }}</div>
+                                <div class="text-caption">Zone: {{ selectedData.zone }}</div>
+                                <v-btn size="x-small" variant="text" color="error" class="px-0 mt-1" @click="clearAnchor">
+                                    Clear Anchor
+                                </v-btn>
+                            </v-card>
+                        </v-col>
                         <v-col cols="12">
                             <v-btn color="primary" variant="outlined" @click="resetView" block>Reset Camera</v-btn>
                         </v-col>
@@ -88,12 +98,12 @@
         <!-- Main Content (3D Canvas) -->
         <v-main class="bg-black pa-0">
             <AppOverlay position="bottom" padding="pa-3">
-                <div class="d-flex align-center">
+                <div class="d-flex align-center flex-wrap gap-2">
                     <v-icon color="info" class="mr-2">mdi-information</v-icon>
                     <div class="text-body-2">
+                        Click block to <v-chip size="x-small" color="primary">Anchor Camera</v-chip>.
                         Use <v-chip size="x-small">W, A, S, D</v-chip> to fly.
-                        Use <v-chip size="x-small">Q/E</v-chip> for up/down, <v-chip size="x-small">Shift</v-chip> for
-                        speed
+                        Use <v-chip size="x-small">Q/E</v-chip> for up/down, <v-chip size="x-small">Shift</v-chip> for speed
                     </div>
                 </div>
             </AppOverlay>
@@ -163,10 +173,21 @@ let floor: THREE.Mesh | null = null;
 const instanceDataMap = new Map<number, any>();
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
+const selectedData = ref<any>(null);
+let selectedInstanceId = -1;
+let selectionBoxMesh: THREE.LineSegments | null = null;
+let pointerDownPos = { x: 0, y: 0 };
+let isCameraTransitioning = false;
+let cameraLerpProgress = 0;
+const cameraStartPos = new THREE.Vector3();
+const cameraEndPos = new THREE.Vector3();
+const targetStartPos = new THREE.Vector3();
+const targetEndPos = new THREE.Vector3();
 let hoveredInstanceId = -1;
 const originalColor = new THREE.Color();
 const highlightColor = new THREE.Color(0xffffff);
 const sharedMatrix = new THREE.Matrix4();
+const defaultCamPos = new THREE.Vector3(15, 90, 150);
 
 const keys = { w: false, a: false, s: false, d: false, q: false, e: false, shift: false };
 
@@ -226,6 +247,8 @@ function initThree() {
 
 function renderLocations(locations: any[]) {
     if (!scene) return;
+
+    clearAnchor();
 
     if (instancedMesh) {
         scene.remove(instancedMesh);
@@ -342,8 +365,90 @@ function getMax(arr: number[]): number {
     return max;
 }
 
+function selectBlock(instanceId: number) {
+    if (!instancedMesh || !scene || !controls || !camera) return;
+
+    const data = instanceDataMap.get(instanceId);
+    if (!data) return;
+
+    selectedInstanceId = instanceId;
+    selectedData.value = data;
+
+    // Get block world position & scale from instanceMatrix and mesh position
+    const mat = new THREE.Matrix4();
+    instancedMesh.getMatrixAt(instanceId, mat);
+    const pos = new THREE.Vector3();
+    const quat = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    mat.decompose(pos, quat, scale);
+    pos.add(instancedMesh.position);
+
+    // Create or update bounding box wireframe highlight
+    if (selectionBoxMesh) {
+        scene.remove(selectionBoxMesh);
+        selectionBoxMesh.geometry.dispose();
+        (selectionBoxMesh.material as THREE.Material).dispose();
+        selectionBoxMesh = null;
+    }
+
+    const boxGeo = new THREE.BoxGeometry(
+        CONFIG.boxSize.width * scale.x * 1.05,
+        CONFIG.boxSize.height * scale.y * 1.05,
+        CONFIG.boxSize.depth * scale.z * 1.05
+    );
+    const edges = new THREE.EdgesGeometry(boxGeo);
+    const lineMat = new THREE.LineBasicMaterial({
+        color: 0x38bdf8,
+        linewidth: 2,
+        depthTest: false,
+        transparent: true,
+        opacity: 0.95
+    });
+    selectionBoxMesh = new THREE.LineSegments(edges, lineMat);
+    selectionBoxMesh.renderOrder = 999;
+    selectionBoxMesh.position.copy(pos);
+    scene.add(selectionBoxMesh);
+
+    // Transition camera to anchor onto the block
+    targetStartPos.copy(controls.target);
+    targetEndPos.copy(pos);
+
+    cameraStartPos.copy(camera.position);
+    const currentOffset = new THREE.Vector3().subVectors(camera.position, controls.target);
+    const desiredDistance = THREE.MathUtils.clamp(currentOffset.length(), 20, 60);
+    const dir = currentOffset.normalize();
+    if (dir.lengthSq() < 0.001) {
+        dir.set(0.5, 0.5, 1).normalize();
+    }
+    cameraEndPos.copy(pos).addScaledVector(dir, desiredDistance);
+
+    cameraLerpProgress = 0;
+    isCameraTransitioning = true;
+}
+
+function clearAnchor() {
+    selectedData.value = null;
+    selectedInstanceId = -1;
+    if (selectionBoxMesh && scene) {
+        scene.remove(selectionBoxMesh);
+        selectionBoxMesh.geometry.dispose();
+        (selectionBoxMesh.material as THREE.Material).dispose();
+        selectionBoxMesh = null;
+    }
+}
+
 function resetView() {
-    controls.reset()
+    clearAnchor();
+    if (!controls || !camera) return;
+
+    targetStartPos.copy(controls.target);
+    targetEndPos.set(0, 0, 0);
+
+    cameraStartPos.copy(camera.position);
+    cameraEndPos.copy(defaultCamPos);
+
+    cameraLerpProgress = 0;
+    isCameraTransitioning = true;
 }
 
 const zoneColorCache = new Map<string, { hex: number, colorHex: string }>();
@@ -475,6 +580,18 @@ function animate() {
         }
     }
 
+    if (isCameraTransitioning && controls && camera) {
+        cameraLerpProgress += 0.04;
+        if (cameraLerpProgress >= 1) {
+            cameraLerpProgress = 1;
+            isCameraTransitioning = false;
+        }
+        // Smooth ease-out cubic
+        const t = 1 - Math.pow(1 - cameraLerpProgress, 3);
+        camera.position.lerpVectors(cameraStartPos, cameraEndPos, t);
+        controls.target.lerpVectors(targetStartPos, targetEndPos, t);
+    }
+
     controls?.update();
 
     raycaster.setFromCamera(mouse, camera);
@@ -521,6 +638,24 @@ function handleResize() {
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     renderer.setSize(width, height);
+}
+
+function onPointerDown(event: MouseEvent) {
+    pointerDownPos = { x: event.clientX, y: event.clientY };
+}
+
+function onPointerUp(event: MouseEvent) {
+    const dist = Math.hypot(event.clientX - pointerDownPos.x, event.clientY - pointerDownPos.y);
+    // Ignore drags
+    if (dist > 5) return;
+    if (!instancedMesh || !camera) return;
+
+    // Use current raycaster to select clicked block
+    const intersection = raycaster.intersectObject(instancedMesh);
+    if (intersection.length > 0 && intersection[0].instanceId !== undefined) {
+        const instanceId = intersection[0].instanceId;
+        selectBlock(instanceId);
+    }
 }
 
 function onPointerMove(event: MouseEvent) {
@@ -599,6 +734,10 @@ onMounted(() => {
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    if (container.value) {
+        container.value.addEventListener('pointerdown', onPointerDown);
+        container.value.addEventListener('pointerup', onPointerUp);
+    }
 });
 
 onBeforeUnmount(() => {
@@ -606,6 +745,11 @@ onBeforeUnmount(() => {
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('keyup', onKeyUp);
+    if (container.value) {
+        container.value.removeEventListener('pointerdown', onPointerDown);
+        container.value.removeEventListener('pointerup', onPointerUp);
+    }
+    clearAnchor();
     renderer?.dispose();
 });
 </script>
