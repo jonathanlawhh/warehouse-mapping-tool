@@ -1,82 +1,99 @@
 <template>
     <div>
         <!-- Navigation Drawer for Controls -->
-        <AppSidebar app-link="/equ" app-icon="mdi-forklift">
-            <template #default>
-                <div class="mb-6 mt-16">
-                    <div class="text-overline mb-2">Import Layout</div>
-                    <v-file-input label="Upload CSV File" prepend-icon="mdi-file-upload" accept=".csv"
-                        variant="outlined" density="compact" hide-details @change="handleCSVUpload"></v-file-input>
-                    <div class="text-caption mt-1 text-medium-emphasis">
-                        Format: x, y, z, name, occupied, size_x, size_y, size_z, enabled, zone1, zone2, zone3, zone4
-                    </div>
-                    <v-btn href="/template/mapping_template.csv" download target="_blank"
-                        variant="text" size="small" color="primary" class="mt-2 px-0 font-weight-bold"
-                        prepend-icon="mdi-download">
-                        Download Template
+        <AppSidebar app-link="/equ" app-icon="mdi-forklift" width="340">
+            <!-- Header Toolbar: Home + Action Icons (Upload, Download, Reset) -->
+            <template #header>
+                <div class="d-flex align-center justify-space-between mb-3">
+                    <v-btn variant="tonal" color="primary" to="/" prepend-icon="mdi-home" size="small" rounded="lg" class="font-weight-bold">
+                        Home
                     </v-btn>
+                    <div class="d-flex align-center gap-1">
+                        <v-tooltip text="Import Layout CSV" location="bottom">
+                            <template #activator="{ props }">
+                                <v-btn v-bind="props" icon="mdi-file-upload-outline" variant="text" size="small"
+                                    color="primary" @click="showImportDialog = true"></v-btn>
+                            </template>
+                        </v-tooltip>
+                        <v-tooltip text="Reset Camera" location="bottom">
+                            <template #activator="{ props }">
+                                <v-btn v-bind="props" icon="mdi-camera-retake-outline" variant="text" size="small"
+                                    @click="resetView"></v-btn>
+                            </template>
+                        </v-tooltip>
+                    </div>
                 </div>
 
-                <v-divider class="mb-6"></v-divider>
-
-                <div class="mb-6">
-                    <div class="text-overline mb-2">Quick Stats</div>
-                    <v-row dense>
-                        <v-col cols="4">
-                            <v-card variant="tonal" class="pa-2 text-center" color="primary">
-                                <div class="text-caption">Total</div>
-                                <div class="text-h6 font-weight-bold">{{ filteredCount }}</div>
-                            </v-card>
-                        </v-col>
-                        <v-col cols="4">
-                            <v-card variant="tonal" class="pa-2 text-center" color="error">
-                                <div class="text-caption">Occupied</div>
-                                <div class="text-h6 font-weight-bold">{{ filteredOccupiedCount }}</div>
-                            </v-card>
-                        </v-col>
-                        <v-col cols="4">
-                            <v-card variant="tonal" class="pa-2 text-center" color="secondary">
-                                <div class="text-caption">Zones</div>
-                                <div class="text-h6 font-weight-bold">{{ filteredZoneCount }}</div>
-                            </v-card>
-                        </v-col>
-                    </v-row>
-                </div>
-
-                <v-divider class="mb-6"></v-divider>
-
-                <div class="mb-6">
-                    <div class="text-overline mb-2">Filters</div>
-                    <v-list-subheader>Level Filter</v-list-subheader>
-                    <v-slider v-model="levelFilter" :min="0" :max="maxLevels" :step="1" class="px-2" color="primary"
-                        thumb-label track-color="surface-variant" @update:model-value="applyFilter">
-                        <template v-slot:append>
-                            <div class="text-body-2 font-weight-bold" style="width: 40px">
-                                {{ levelFilter === 0 ? 'All' : levelFilter }}
+                <!-- Minimalist Metrics Bar -->
+                <v-card color="primary" variant="tonal" class="pa-2 mb-3 rounded-lg border border-primary">
+                    <div class="d-flex align-center justify-space-between">
+                        <div class="text-center flex-grow-1">
+                            <div class="text-caption font-weight-bold" style="font-size: 10px; opacity: 0.85;">TOTAL</div>
+                            <div class="text-body-1 font-weight-bold">{{ filteredCount.toLocaleString() }}</div>
+                        </div>
+                        <v-divider vertical class="mx-1"></v-divider>
+                        <div class="text-center flex-grow-1">
+                            <div class="text-caption font-weight-bold" style="font-size: 10px; opacity: 0.85;">OCCUPIED</div>
+                            <div class="text-body-1 font-weight-bold">
+                                {{ filteredOccupiedCount.toLocaleString() }}
+                                <span class="text-caption font-weight-regular" style="font-size: 11px; opacity: 0.9;">
+                                    ({{ filteredCount ? Math.round((filteredOccupiedCount / filteredCount) * 100) : 0 }}%)
+                                </span>
                             </div>
-                        </template>
-                    </v-slider>
+                        </div>
+                        <v-divider vertical class="mx-1"></v-divider>
+                        <div class="text-center flex-grow-1">
+                            <div class="text-caption font-weight-bold" style="font-size: 10px; opacity: 0.85;">ZONES</div>
+                            <div class="text-body-1 font-weight-bold">{{ filteredZoneCount }}</div>
+                        </div>
+                    </div>
+                </v-card>
+            </template>
 
-                    <v-list-subheader class="px-2">Zone Tier Selection</v-list-subheader>
-                    <div class="px-2 mb-3">
+            <!-- Main Filter Controls -->
+            <template #default>
+                <div class="d-flex flex-column gap-3 py-1">
+                    <!-- Level Filter -->
+                    <div>
+                        <div class="d-flex justify-space-between align-center mb-1">
+                            <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Level</span>
+                            <v-chip size="x-small" color="primary" variant="tonal" class="font-weight-bold">
+                                {{ levelFilter === 0 ? 'All Levels' : `Level ${levelFilter}` }}
+                            </v-chip>
+                        </div>
+                        <v-slider v-model="levelFilter" :min="0" :max="maxLevels" :step="1" color="primary"
+                            density="compact" hide-details @update:model-value="applyFilter" class="pa-2"></v-slider>
+                    </div>
+
+                    <!-- Zone Tier Selector & Filter -->
+                    <div>
+                        <div class="d-flex justify-space-between align-center mb-1">
+                            <span class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Zone Tier</span>
+                            <span class="text-caption text-medium-emphasis">{{ zoneTierLabels[selectedZoneTier] }}</span>
+                        </div>
                         <v-btn-toggle v-model="selectedZoneTier" mandatory density="compact" color="primary"
-                            variant="outlined" divided class="w-100 d-flex" @update:model-value="onZoneTierChange">
-                            <v-btn value="zone1" class="flex-grow-1 text-none px-1" size="small">Zone 1</v-btn>
-                            <v-btn value="zone2" class="flex-grow-1 text-none px-1" size="small">Zone 2</v-btn>
-                            <v-btn value="zone3" class="flex-grow-1 text-none px-1" size="small">Zone 3</v-btn>
-                            <v-btn value="zone4" class="flex-grow-1 text-none px-1" size="small">Zone 4</v-btn>
+                            variant="outlined" divided class="w-100 d-flex mb-2" @update:model-value="onZoneTierChange">
+                            <v-btn value="zone1" class="flex-grow-1 text-none px-0" size="small">Z1</v-btn>
+                            <v-btn value="zone2" class="flex-grow-1 text-none px-0" size="small">Z2</v-btn>
+                            <v-btn value="zone3" class="flex-grow-1 text-none px-0" size="small">Z3</v-btn>
+                            <v-btn value="zone4" class="flex-grow-1 text-none px-0" size="small">Z4</v-btn>
                         </v-btn-toggle>
-                    </div>
 
-                    <v-list-subheader class="px-2">Zone Filter ({{ zoneTierLabels[selectedZoneTier] }})</v-list-subheader>
-                    <div class="px-2 mb-2">
                         <v-autocomplete v-model="zoneValuesFilter" :items="availableZoneValues" density="compact" variant="outlined"
-                            color="primary" multiple chips closable-chips clearable
-                            :placeholder="`Filter ${zoneTierLabels[selectedZoneTier]}...`" @update:model-value="applyFilter"></v-autocomplete>
+                            color="primary" multiple chips closable-chips clearable hide-details
+                            :placeholder="`All ${zoneTierLabels[selectedZoneTier]} values`"
+                            @update:model-value="applyFilter">
+                            <template #chip="{ props, item }">
+                                <v-chip v-bind="props" size="x-small" variant="tonal" color="primary" class="font-weight-medium">
+                                    {{ item.title }}
+                                </v-chip>
+                            </template>
+                        </v-autocomplete>
                     </div>
 
-                    <v-list-subheader class="px-2">Occupancy Status</v-list-subheader>
-                    <div class="px-2 mb-3">
+                    <!-- Occupancy Status -->
+                    <div>
+                        <div class="text-caption font-weight-bold text-uppercase text-medium-emphasis mb-1 mt-4">Occupancy</div>
                         <v-btn-toggle v-model="occupiedFilter" mandatory density="compact" color="primary"
                             variant="outlined" divided class="w-100 d-flex" @update:model-value="applyFilter">
                             <v-btn value="all" class="flex-grow-1 text-none" size="small">All</v-btn>
@@ -85,8 +102,16 @@
                         </v-btn-toggle>
                     </div>
 
-                    <v-list-subheader class="px-2">Location Status</v-list-subheader>
-                    <div class="px-2 mb-3">
+                    <!-- Visualize Occupied Switch -->
+                    <div class="d-flex align-center justify-space-between pt-1">
+                        <span class="text-body-2 font-weight-medium">Visualize Occupancy</span>
+                        <v-switch v-model="visualizeOccupied" color="primary" density="compact" hide-details
+                            @update:model-value="updateColors"></v-switch>
+                    </div>
+
+                    <!-- Location Status -->
+                    <div>
+                        <div class="text-caption font-weight-bold text-uppercase text-medium-emphasis mb-1 mt-4">Location Status</div>
                         <v-btn-toggle v-model="enabledFilter" mandatory density="compact" color="primary"
                             variant="outlined" divided class="w-100 d-flex" @update:model-value="applyFilter">
                             <v-btn value="all" class="flex-grow-1 text-none" size="small">All</v-btn>
@@ -94,29 +119,23 @@
                             <v-btn value="disabled" class="flex-grow-1 text-none" size="small">Disabled</v-btn>
                         </v-btn-toggle>
                     </div>
-
-                    <v-divider class="my-3"></v-divider>
-
-                    <v-switch v-model="visualizeOccupied" color="primary" density="compact" class="px-2"
-                        label="Visualize Occupied" hide-details @update:model-value="updateColors"></v-switch>
                 </div>
+            </template>
 
-                <v-divider class="mb-6"></v-divider>
-
-                <div class="mb-6">
-                    <div class="text-overline mb-2">Controls</div>
-                    <v-row dense>
-                        <v-col cols="12" class="mb-2" v-if="selectedData">
+            <!-- Sticky Footer: Anchored Block Card + Reset Camera -->
+            <template #footer>
+                <div class="pt-2 border-t mt-auto">
+                    <v-expand-transition>
+                        <div v-if="selectedData" class="mb-2">
                             <v-card variant="tonal" color="info" class="pa-2">
-                                <div class="text-caption text-medium-emphasis">Anchored Block</div>
-                                <div class="text-body-2 font-weight-bold">{{ selectedData.name }}</div>
-                                <div class="text-caption">
-                                    Active ({{ zoneTierLabels[selectedZoneTier] }}): 
-                                    <strong>{{ getActiveZone(selectedData) }}</strong>
+                                <div class="d-flex align-center justify-space-between mb-1">
+                                    <span class="text-caption font-weight-bold text-uppercase">Anchored Block</span>
+                                    <v-btn size="x-small" variant="text" icon="mdi-close" color="error" @click="clearAnchor"></v-btn>
                                 </div>
-                                <div class="text-caption text-medium-emphasis">
-                                    Z1: {{ selectedData.zone1 || '-' }} | Z2: {{ selectedData.zone2 || '-' }}<br>
-                                    Z3: {{ selectedData.zone3 || '-' }} | Z4: {{ selectedData.zone4 || '-' }}
+                                <div class="text-body-2 font-weight-bold mb-1">{{ selectedData.name }}</div>
+                                <div class="text-caption text-medium-emphasis" style="font-size: 11px;">
+                                    Z1: {{ selectedData.zone1 || '-' }} • Z2: {{ selectedData.zone2 || '-' }}<br>
+                                    Z3: {{ selectedData.zone3 || '-' }} • Z4: {{ selectedData.zone4 || '-' }}
                                 </div>
                                 <div class="text-caption mt-1">
                                     Status: 
@@ -124,20 +143,43 @@
                                         {{ selectedData.enabled ? 'Enabled' : 'Disabled' }}
                                     </span>
                                 </div>
-                                <v-btn size="x-small" variant="text" color="error" class="px-0 mt-1" @click="clearAnchor">
-                                    Clear Anchor
-                                </v-btn>
                             </v-card>
-                        </v-col>
-                        <v-col cols="12">
-                            <v-btn color="primary" variant="outlined" @click="resetView" block>Reset Camera</v-btn>
-                        </v-col>
-                    </v-row>
+                        </div>
+                    </v-expand-transition>
+                    <v-btn color="primary" variant="outlined" prepend-icon="mdi-camera-retake" @click="resetView" block size="small">
+                        Reset Camera
+                    </v-btn>
                 </div>
-
-
             </template>
         </AppSidebar>
+
+        <!-- Import Modal Dialog -->
+        <v-dialog v-model="showImportDialog" max-width="520">
+            <v-card class="pa-4 rounded-xl">
+                <v-card-title class="d-flex align-center justify-space-between px-2 pt-1 pb-3">
+                    <span class="text-h6 font-weight-bold">Import Layout CSV</span>
+                    <v-btn icon="mdi-close" variant="text" size="small" @click="showImportDialog = false"></v-btn>
+                </v-card-title>
+                <v-card-text class="px-2 py-0">
+                    <v-file-input label="Upload CSV File" prepend-icon="mdi-file-upload" accept=".csv"
+                        variant="outlined" density="comfortable" hide-details class="mb-3"
+                        @change="(e: any) => { handleCSVUpload(e); showImportDialog = false; }"></v-file-input>
+                    <div class="pa-3 rounded-lg bg-surface-variant border mb-3">
+                        <div class="text-caption font-weight-bold text-uppercase text-medium-emphasis mb-1">Expected Format</div>
+                        <div class="text-caption font-mono text-medium-emphasis">
+                            x, y, z, name, occupied, size_x, size_y, size_z, enabled, zone1, zone2, zone3, zone4
+                        </div>
+                    </div>
+                </v-card-text>
+                <v-card-actions class="px-2 pb-1 d-flex justify-space-between">
+                    <v-btn href="/template/mapping_template.csv" download target="_blank"
+                        variant="text" size="small" color="primary" prepend-icon="mdi-download" class="font-weight-bold">
+                        Download Template
+                    </v-btn>
+                    <v-btn variant="text" @click="showImportDialog = false">Close</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
 
         <!-- Main Content (3D Canvas) -->
         <v-main class="bg-black pa-0">
@@ -189,6 +231,8 @@ import { onMounted, onBeforeUnmount, ref, reactive, shallowRef } from 'vue';
 useHead({
     title: 'Mapping | Warehouse Mapping Tool'
 });
+
+const showImportDialog = ref(false);
 
 const CONFIG = {
     boxSize: { width: 1.0, height: 1.0, depth: 1.0 },
