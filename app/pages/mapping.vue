@@ -8,7 +8,7 @@
                     <v-file-input label="Upload CSV File" prepend-icon="mdi-file-upload" accept=".csv"
                         variant="outlined" density="compact" hide-details @change="handleCSVUpload"></v-file-input>
                     <div class="text-caption mt-1 text-medium-emphasis">
-                        Format: x, y, z, zone, name, occupied, size_x, size_y, size_z, enabled
+                        Format: x, y, z, name, occupied, size_x, size_y, size_z, enabled, zone1, zone2, zone3, zone4
                     </div>
                     <v-btn href="/template/mapping_template.csv" download target="_blank"
                         variant="text" size="small" color="primary" class="mt-2 px-0 font-weight-bold"
@@ -57,9 +57,23 @@
                         </template>
                     </v-slider>
 
-                    <v-autocomplete v-model="zoneFilter" :items="availableZones" density="compact" variant="outlined"
-                        class="px-2" color="primary" multiple chips closable-chips clearable
-                        placeholder="Search zones..." @update:model-value="applyFilter"></v-autocomplete>
+                    <v-list-subheader class="px-2">Zone Tier Selection</v-list-subheader>
+                    <div class="px-2 mb-3">
+                        <v-btn-toggle v-model="selectedZoneTier" mandatory density="compact" color="primary"
+                            variant="outlined" divided class="w-100 d-flex" @update:model-value="onZoneTierChange">
+                            <v-btn value="zone1" class="flex-grow-1 text-none px-1" size="small">Zone 1</v-btn>
+                            <v-btn value="zone2" class="flex-grow-1 text-none px-1" size="small">Zone 2</v-btn>
+                            <v-btn value="zone3" class="flex-grow-1 text-none px-1" size="small">Zone 3</v-btn>
+                            <v-btn value="zone4" class="flex-grow-1 text-none px-1" size="small">Zone 4</v-btn>
+                        </v-btn-toggle>
+                    </div>
+
+                    <v-list-subheader class="px-2">Zone Filter ({{ zoneTierLabels[selectedZoneTier] }})</v-list-subheader>
+                    <div class="px-2 mb-2">
+                        <v-autocomplete v-model="zoneValuesFilter" :items="availableZoneValues" density="compact" variant="outlined"
+                            color="primary" multiple chips closable-chips clearable
+                            :placeholder="`Filter ${zoneTierLabels[selectedZoneTier]}...`" @update:model-value="applyFilter"></v-autocomplete>
+                    </div>
 
                     <v-list-subheader class="px-2">Occupancy Status</v-list-subheader>
                     <div class="px-2 mb-3">
@@ -96,8 +110,15 @@
                             <v-card variant="tonal" color="info" class="pa-2">
                                 <div class="text-caption text-medium-emphasis">Anchored Block</div>
                                 <div class="text-body-2 font-weight-bold">{{ selectedData.name }}</div>
-                                <div class="text-caption">Zone: {{ selectedData.zone }}</div>
                                 <div class="text-caption">
+                                    Active ({{ zoneTierLabels[selectedZoneTier] }}): 
+                                    <strong>{{ getActiveZone(selectedData) }}</strong>
+                                </div>
+                                <div class="text-caption text-medium-emphasis">
+                                    Z1: {{ selectedData.zone1 || '-' }} | Z2: {{ selectedData.zone2 || '-' }}<br>
+                                    Z3: {{ selectedData.zone3 || '-' }} | Z4: {{ selectedData.zone4 || '-' }}
+                                </div>
+                                <div class="text-caption mt-1">
                                     Status: 
                                     <span :class="selectedData.enabled ? 'text-success' : 'text-medium-emphasis'">
                                         {{ selectedData.enabled ? 'Enabled' : 'Disabled' }}
@@ -137,17 +158,23 @@
                     top: tooltipPos.y + 'px'
                 }">
                     <div class="text-h6 mb-1">{{ hoveredData.name }}</div>
-                    <v-chip :color="hoveredData.colorHex" size="small" class="font-weight-bold" variant="flat">
-                        {{ hoveredData.zone }}
-                    </v-chip>
-                    <v-chip :color="hoveredData.occupied ? 'error' : 'success'" size="small"
-                        class="font-weight-bold ml-2" variant="flat">
-                        {{ hoveredData.occupied ? 'Occupied' : 'Empty' }}
-                    </v-chip>
-                    <v-chip :color="hoveredData.enabled ? 'primary' : 'grey'" size="small"
-                        class="font-weight-bold ml-2" variant="flat">
-                        {{ hoveredData.enabled ? 'Enabled' : 'Disabled' }}
-                    </v-chip>
+                    <div class="d-flex align-center flex-wrap gap-1 mb-1">
+                        <v-chip :color="hoveredData.colorHex" size="small" class="font-weight-bold" variant="flat">
+                            {{ getActiveZone(hoveredData) }}
+                        </v-chip>
+                        <v-chip :color="hoveredData.occupied ? 'error' : 'success'" size="small"
+                            class="font-weight-bold" variant="flat">
+                            {{ hoveredData.occupied ? 'Occupied' : 'Empty' }}
+                        </v-chip>
+                        <v-chip :color="hoveredData.enabled ? 'primary' : 'grey'" size="small"
+                            class="font-weight-bold" variant="flat">
+                            {{ hoveredData.enabled ? 'Enabled' : 'Disabled' }}
+                        </v-chip>
+                    </div>
+                    <div class="text-caption text-medium-emphasis mt-1">
+                        Z1: {{ hoveredData.zone1 || '-' }} | Z2: {{ hoveredData.zone2 || '-' }}<br>
+                        Z3: {{ hoveredData.zone3 || '-' }} | Z4: {{ hoveredData.zone4 || '-' }}
+                    </div>
                 </div>
             </div>
         </v-main>
@@ -179,19 +206,37 @@ const CONFIG = {
     rackSpacing: 8
 };
 
+const selectedZoneTier = ref<'zone1' | 'zone2' | 'zone3' | 'zone4'>('zone1');
+const zoneTierLabels: Record<string, string> = {
+    zone1: 'Zone 1',
+    zone2: 'Zone 2',
+    zone3: 'Zone 3',
+    zone4: 'Zone 4'
+};
+const zoneValuesFilter = ref<string[]>([]);
+const availableZoneValues = ref<string[]>([]);
 const levelFilter = ref(0);
-const zoneFilter = ref<string[]>([]);
 const occupiedFilter = ref('all');
 const enabledFilter = ref('all');
 const visualizeOccupied = ref(false);
 const maxLevels = ref(1);
-const availableZones = ref<string[]>([]);
 const locationData = shallowRef<any[]>([]);
 const filteredCount = ref(0);
 const filteredZoneCount = ref(0);
 const filteredOccupiedCount = ref(0);
 const hoveredData = ref<any>(null);
 const tooltipPos = reactive({ x: 0, y: 0 });
+
+function getActiveZone(data: any): string {
+    if (!data) return '';
+    return data[selectedZoneTier.value] || data.zone || '';
+}
+
+function onZoneTierChange() {
+    zoneValuesFilter.value = [];
+    updateColors();
+    applyFilter();
+}
 
 const container = ref<HTMLElement | null>(null);
 let scene: THREE.Scene | null = null;
@@ -357,7 +402,8 @@ function renderLocations(locations: any[]) {
 
         instancedMesh.setMatrixAt(i, sharedMatrix);
 
-        const zoneInfo = getZoneColor(data.zone, data.occupied, data.enabled);
+        const activeZone = getActiveZone(data);
+        const zoneInfo = getZoneColor(activeZone, data.occupied, data.enabled);
         data.colorHex = zoneInfo.colorHex;
         color.setHex(zoneInfo.hex);
         instancedMesh.setColorAt(i, color);
@@ -367,7 +413,7 @@ function renderLocations(locations: any[]) {
         if (zPos < minZ) minZ = zPos;
         if (zPos > maxZ) maxZ = zPos;
         if (l > maxL) maxL = l;
-        zoneSet.add(data.zone);
+        if (activeZone) zoneSet.add(activeZone);
 
         instanceDataMap.set(i, data);
     }
@@ -393,7 +439,7 @@ function renderLocations(locations: any[]) {
     }
 
     maxLevels.value = maxL;
-    availableZones.value = Array.from(zoneSet).sort();
+    availableZoneValues.value = Array.from(zoneSet).sort();
     filteredCount.value = locations.length;
     filteredZoneCount.value = zoneSet.size;
     filteredOccupiedCount.value = locations.filter(l => l.occupied).length;
@@ -530,7 +576,8 @@ function updateColors() {
     for (let i = 0; i < total; i++) {
         const data = instanceDataMap.get(i);
         if (!data) continue;
-        const zoneInfo = getZoneColor(data.zone, data.occupied, data.enabled);
+        const activeZone = getActiveZone(data);
+        const zoneInfo = getZoneColor(activeZone, data.occupied, data.enabled);
         data.colorHex = zoneInfo.colorHex;
         if (i !== hoveredInstanceId) {
             color.setHex(zoneInfo.hex);
@@ -552,11 +599,12 @@ function applyFilter() {
     let occupiedCount = 0;
     const activeZones = new Set<string>();
     const zonesInLevel = new Set<string>();
-    const zoneFilterSet = new Set(zoneFilter.value);
+    const zoneFilterSet = new Set(zoneValuesFilter.value);
     const hasZoneFilter = zoneFilterSet.size > 0;
     const currentLevelFilter = levelFilter.value;
     const currentOccupiedFilter = occupiedFilter.value;
     const currentEnabledFilter = enabledFilter.value;
+    const currentTier = selectedZoneTier.value;
     const dataList = locationData.value;
     const total = dataList.length;
 
@@ -565,12 +613,13 @@ function applyFilter() {
     for (let i = 0; i < total; i++) {
         const data = dataList[i];
         const levelMatch = (currentLevelFilter === 0) || (data.z === currentLevelFilter);
+        const locZone = data[currentTier] || data.zone || '';
 
-        if (levelMatch) {
-            zonesInLevel.add(data.zone);
+        if (levelMatch && locZone) {
+            zonesInLevel.add(locZone);
         }
 
-        const zoneMatch = !hasZoneFilter || zoneFilterSet.has(data.zone);
+        const zoneMatch = !hasZoneFilter || zoneFilterSet.has(locZone);
 
         const occupancyMatch =
             (currentOccupiedFilter === 'all') ||
@@ -585,7 +634,7 @@ function applyFilter() {
         if (levelMatch && zoneMatch && occupancyMatch && enabledMatch) {
             count++;
             if (data.occupied) occupiedCount++;
-            activeZones.add(data.zone);
+            if (locZone) activeZones.add(locZone);
             const xPos = (data.x - 1) * CONFIG.rackSpacing;
             const yPos = boxHeightHalf + (data.z - 1) * levelHeight;
             const zPos = (data.y - 1) * compWidth;
@@ -615,7 +664,7 @@ function applyFilter() {
     filteredCount.value = count;
     filteredOccupiedCount.value = occupiedCount;
     filteredZoneCount.value = activeZones.size;
-    availableZones.value = Array.from(zonesInLevel).sort();
+    availableZoneValues.value = Array.from(zonesInLevel).sort();
     instancedMesh.instanceMatrix.needsUpdate = true;
 }
 
@@ -745,15 +794,27 @@ function onPointerMove(event: MouseEvent) {
 
 function generateMockData() {
     const data = [];
+    const whZones = ['NORTH_WH', 'SOUTH_WH'];
     for (let x = 1; x <= 6; x++) {
+        const wh = whZones[x <= 3 ? 0 : 1];
         for (let y = 1; y <= 30; y++) {
             for (let z = 1; z <= 8; z++) {
                 let zoneType = 'STORAGE';
                 if (z <= 2) zoneType = 'PICKING';
-                else if (z >= 5) zoneType = 'OVERFLOW';
+                else if (z >= 7) zoneType = 'OVERFLOW';
+
+                const z1 = wh;
+                const z2 = zoneType;
+                const z3 = `AISLE_${x.toString().padStart(2, '0')}`;
+                const z4 = `BAY_${x}_${Math.ceil(y / 5)}`;
+
                 data.push({
                     x: x, y: y, z: z,
-                    zone: `${zoneType}_${x}`,
+                    zone1: z1,
+                    zone2: z2,
+                    zone3: z3,
+                    zone4: z4,
+                    zone: z1,
                     name: `LOC-${x.toString().padStart(2, '0')}-${y.toString().padStart(2, '0')}-${z}`,
                     occupied: Math.random() > 0.8,
                     size_x: 1,
@@ -782,20 +843,33 @@ function handleCSVUpload(event: any) {
         for (let i = 1; i < lines.length; i++) {
             const vals = lines[i].split(',');
             if (vals.length < 5) continue;
-            const occupiedVal = String(vals[colMap['occupied'] ?? 5] ?? '').toLowerCase().trim();
+            const occupiedVal = String(vals[colMap['occupied'] !== undefined ? colMap['occupied'] : 4] ?? '').toLowerCase().trim();
             const enabledRaw = colMap['enabled'] !== undefined ? String(vals[colMap['enabled']] ?? '').toLowerCase().trim() : '';
             const isEnabled = enabledRaw === '' ? true : (enabledRaw === '1' || enabledRaw === 'true' || enabledRaw === 'yes');
+
+            const legacyZone = colMap['zone'] !== undefined ? String(vals[colMap['zone']] ?? '').toUpperCase().replaceAll('"', "").trim() : '';
+            const z1 = colMap['zone1'] !== undefined ? String(vals[colMap['zone1']] ?? '').toUpperCase().replaceAll('"', "").trim() : legacyZone;
+            const z2 = colMap['zone2'] !== undefined ? String(vals[colMap['zone2']] ?? '').toUpperCase().replaceAll('"', "").trim() : legacyZone;
+            const z3 = colMap['zone3'] !== undefined ? String(vals[colMap['zone3']] ?? '').toUpperCase().replaceAll('"', "").trim() : legacyZone;
+            const z4 = colMap['zone4'] !== undefined ? String(vals[colMap['zone4']] ?? '').toUpperCase().replaceAll('"', "").trim() : legacyZone;
+
+            const nameIdx = colMap['name'] !== undefined ? colMap['name'] : (colMap['zone'] !== undefined ? 4 : 3);
+
             results.push({
                 x: parseInt(vals[colMap['x'] ?? 0]) || 0,
                 y: parseInt(vals[colMap['y'] ?? 1]) || 0,
                 z: parseInt(vals[colMap['z'] ?? 2]) || 0,
-                zone: String(vals[colMap['zone'] ?? 3]).toUpperCase().replaceAll('"', "").trim(),
-                name: String(vals[colMap['name'] ?? 4]).toUpperCase().replaceAll('"', "").trim(),
+                name: String(vals[nameIdx] ?? '').toUpperCase().replaceAll('"', "").trim(),
                 occupied: occupiedVal === 'true' || occupiedVal === '1' || occupiedVal === 'yes',
                 size_x: parseInt(vals[colMap['size_x']]) || 1,
                 size_y: parseInt(vals[colMap['size_y']]) || 1,
                 size_z: parseInt(vals[colMap['size_z']]) || 1,
-                enabled: isEnabled
+                enabled: isEnabled,
+                zone1: z1,
+                zone2: z2,
+                zone3: z3,
+                zone4: z4,
+                zone: z1 || legacyZone
             });
         }
         if (results.length > 0) {

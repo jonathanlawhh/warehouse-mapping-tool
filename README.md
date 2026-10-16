@@ -49,13 +49,16 @@ To import your own warehouse data, use a CSV file with the following headers:
 | `x` | Rack ID / X-Coordinate | Integer |
 | `y` | Compartment ID / Y-Coordinate | Integer |
 | `z` | Level ID / Z-Coordinate | Integer |
-| `zone` | Functional area name (e.g. `PICKING_01`) | String |
 | `name` | Location label (e.g. `LOC-01-05-02`) | String |
-| `occupied` | Whether the location is occupied (`true`/`false`) | Boolean |
+| `occupied` | Whether the location is occupied (`true`/`false` or `1`/`0`) | Boolean |
 | `size_x` | Width scaling factor for the box (optional, default: `1`) | Integer |
 | `size_y` | Height scaling factor for the box (optional, default: `1`) | Integer |
 | `size_z` | Depth scaling factor for the box (optional, default: `1`) | Integer |
 | `enabled` | Whether the location is active/enabled (`1` for enabled, `0` for disabled) | Integer |
+| `zone1` | Operational zone tier 1 (e.g. `EURO`) | String |
+| `zone2` | Operational zone tier 2 (e.g. `PUTAWAY`) | String |
+| `zone3` | Operational zone tier 3 (e.g. `HB`) | String |
+| `zone4` | Operational zone tier 4 (e.g. `HB_EURO_1`) | String |
 
 ## 🛠️ Tech Stack
 
