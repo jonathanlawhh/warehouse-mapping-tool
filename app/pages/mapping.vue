@@ -8,7 +8,7 @@
                     <v-file-input label="Upload CSV File" prepend-icon="mdi-file-upload" accept=".csv"
                         variant="outlined" density="compact" hide-details @change="handleCSVUpload"></v-file-input>
                     <div class="text-caption mt-1 text-medium-emphasis">
-                        Format: x, y, z, zone, name, occupied, size_x, size_y, size_z
+                        Format: x, y, z, zone, name, occupied, size_x, size_y, size_z, enabled
                     </div>
                     <v-btn href="/template/mapping_template.csv" download target="_blank"
                         variant="text" size="small" color="primary" class="mt-2 px-0 font-weight-bold"
@@ -61,13 +61,25 @@
                         class="px-2" color="primary" multiple chips closable-chips clearable
                         placeholder="Search zones..." @update:model-value="applyFilter"></v-autocomplete>
 
-                    <v-list-subheader>Occupancy Status</v-list-subheader>
-                    <v-radio-group v-model="occupiedFilter" density="compact" class="px-2"
-                        @update:model-value="applyFilter">
-                        <v-radio label="Show All" value="all" color="primary"></v-radio>
-                        <v-radio label="Occupied Only" value="occupied" color="error"></v-radio>
-                        <v-radio label="Empty Only" value="empty" color="success"></v-radio>
-                    </v-radio-group>
+                    <v-list-subheader class="px-2">Occupancy Status</v-list-subheader>
+                    <div class="px-2 mb-3">
+                        <v-btn-toggle v-model="occupiedFilter" mandatory density="compact" color="primary"
+                            variant="outlined" divided class="w-100 d-flex" @update:model-value="applyFilter">
+                            <v-btn value="all" class="flex-grow-1 text-none" size="small">All</v-btn>
+                            <v-btn value="occupied" class="flex-grow-1 text-none" size="small">Occupied</v-btn>
+                            <v-btn value="empty" class="flex-grow-1 text-none" size="small">Empty</v-btn>
+                        </v-btn-toggle>
+                    </div>
+
+                    <v-list-subheader class="px-2">Location Status</v-list-subheader>
+                    <div class="px-2 mb-3">
+                        <v-btn-toggle v-model="enabledFilter" mandatory density="compact" color="primary"
+                            variant="outlined" divided class="w-100 d-flex" @update:model-value="applyFilter">
+                            <v-btn value="all" class="flex-grow-1 text-none" size="small">All</v-btn>
+                            <v-btn value="enabled" class="flex-grow-1 text-none" size="small">Enabled</v-btn>
+                            <v-btn value="disabled" class="flex-grow-1 text-none" size="small">Disabled</v-btn>
+                        </v-btn-toggle>
+                    </div>
 
                     <v-divider class="my-3"></v-divider>
 
@@ -85,6 +97,12 @@
                                 <div class="text-caption text-medium-emphasis">Anchored Block</div>
                                 <div class="text-body-2 font-weight-bold">{{ selectedData.name }}</div>
                                 <div class="text-caption">Zone: {{ selectedData.zone }}</div>
+                                <div class="text-caption">
+                                    Status: 
+                                    <span :class="selectedData.enabled ? 'text-success' : 'text-medium-emphasis'">
+                                        {{ selectedData.enabled ? 'Enabled' : 'Disabled' }}
+                                    </span>
+                                </div>
                                 <v-btn size="x-small" variant="text" color="error" class="px-0 mt-1" @click="clearAnchor">
                                     Clear Anchor
                                 </v-btn>
@@ -126,6 +144,10 @@
                         class="font-weight-bold ml-2" variant="flat">
                         {{ hoveredData.occupied ? 'Occupied' : 'Empty' }}
                     </v-chip>
+                    <v-chip :color="hoveredData.enabled ? 'primary' : 'grey'" size="small"
+                        class="font-weight-bold ml-2" variant="flat">
+                        {{ hoveredData.enabled ? 'Enabled' : 'Disabled' }}
+                    </v-chip>
                 </div>
             </div>
         </v-main>
@@ -151,6 +173,8 @@ const CONFIG = {
         box: 0x1e293b,
         boxEdge: 0x38bdf8,
         floor: 0x1e293b,     // Clean matte studio floor
+        disabled: 0x64748b,  // Grey default color for disabled locations
+        disabledOccupied: 0x475569 // Darker grey when visualizeOccupied is enabled
     },
     rackSpacing: 8
 };
@@ -158,6 +182,7 @@ const CONFIG = {
 const levelFilter = ref(0);
 const zoneFilter = ref<string[]>([]);
 const occupiedFilter = ref('all');
+const enabledFilter = ref('all');
 const visualizeOccupied = ref(false);
 const maxLevels = ref(1);
 const availableZones = ref<string[]>([]);
@@ -332,7 +357,7 @@ function renderLocations(locations: any[]) {
 
         instancedMesh.setMatrixAt(i, sharedMatrix);
 
-        const zoneInfo = getZoneColor(data.zone, data.occupied);
+        const zoneInfo = getZoneColor(data.zone, data.occupied, data.enabled);
         data.colorHex = zoneInfo.colorHex;
         color.setHex(zoneInfo.hex);
         instancedMesh.setColorAt(i, color);
@@ -470,10 +495,15 @@ function resetView() {
 }
 
 const zoneColorCache = new Map<string, { hex: number, colorHex: string }>();
-function getZoneColor(zoneName: string, isOccupied = false): { hex: number, colorHex: string } {
+function getZoneColor(zoneName: string, isOccupied = false, isEnabled = true): { hex: number, colorHex: string } {
     const isDarkened = visualizeOccupied.value && isOccupied;
+    // Disabled locations default to grey (CONFIG.colors.disabled)
+    if (!isEnabled) {
+        const hex = isDarkened ? CONFIG.colors.disabledOccupied : CONFIG.colors.disabled;
+        return { hex, colorHex: isDarkened ? '#475569' : '#64748b' };
+    }
     const cacheKey = `${zoneName}_${isDarkened ? 'occ' : 'default'}`;
-    if (!zoneName) return { hex: 0x64748b, colorHex: '#64748b' };
+    if (!zoneName) return { hex: CONFIG.colors.disabled, colorHex: '#64748b' };
     const cached = zoneColorCache.get(cacheKey);
     if (cached) return cached;
 
@@ -500,7 +530,7 @@ function updateColors() {
     for (let i = 0; i < total; i++) {
         const data = instanceDataMap.get(i);
         if (!data) continue;
-        const zoneInfo = getZoneColor(data.zone, data.occupied);
+        const zoneInfo = getZoneColor(data.zone, data.occupied, data.enabled);
         data.colorHex = zoneInfo.colorHex;
         if (i !== hoveredInstanceId) {
             color.setHex(zoneInfo.hex);
@@ -526,6 +556,7 @@ function applyFilter() {
     const hasZoneFilter = zoneFilterSet.size > 0;
     const currentLevelFilter = levelFilter.value;
     const currentOccupiedFilter = occupiedFilter.value;
+    const currentEnabledFilter = enabledFilter.value;
     const dataList = locationData.value;
     const total = dataList.length;
 
@@ -546,7 +577,12 @@ function applyFilter() {
             (currentOccupiedFilter === 'occupied' && data.occupied) ||
             (currentOccupiedFilter === 'empty' && !data.occupied);
 
-        if (levelMatch && zoneMatch && occupancyMatch) {
+        const enabledMatch =
+            (currentEnabledFilter === 'all') ||
+            (currentEnabledFilter === 'enabled' && data.enabled) ||
+            (currentEnabledFilter === 'disabled' && !data.enabled);
+
+        if (levelMatch && zoneMatch && occupancyMatch && enabledMatch) {
             count++;
             if (data.occupied) occupiedCount++;
             activeZones.add(data.zone);
@@ -722,7 +758,8 @@ function generateMockData() {
                     occupied: Math.random() > 0.8,
                     size_x: 1,
                     size_y: 1,
-                    size_z: 1
+                    size_z: 1,
+                    enabled: Math.random() > 0.15
                 });
             }
         }
@@ -745,17 +782,20 @@ function handleCSVUpload(event: any) {
         for (let i = 1; i < lines.length; i++) {
             const vals = lines[i].split(',');
             if (vals.length < 5) continue;
-            const occupiedVal = String(vals[colMap['occupied'] || 5] || '').toLowerCase().trim();
+            const occupiedVal = String(vals[colMap['occupied'] ?? 5] ?? '').toLowerCase().trim();
+            const enabledRaw = colMap['enabled'] !== undefined ? String(vals[colMap['enabled']] ?? '').toLowerCase().trim() : '';
+            const isEnabled = enabledRaw === '' ? true : (enabledRaw === '1' || enabledRaw === 'true' || enabledRaw === 'yes');
             results.push({
-                x: parseInt(vals[colMap['x'] || 0]) || 0,
-                y: parseInt(vals[colMap['y'] || 1]) || 0,
-                z: parseInt(vals[colMap['z'] || 2]) || 0,
-                zone: String(vals[colMap['zone'] || 3]).toUpperCase().replaceAll('"', "").trim(),
-                name: String(vals[colMap['name'] || 4]).toUpperCase().replaceAll('"', "").trim(),
+                x: parseInt(vals[colMap['x'] ?? 0]) || 0,
+                y: parseInt(vals[colMap['y'] ?? 1]) || 0,
+                z: parseInt(vals[colMap['z'] ?? 2]) || 0,
+                zone: String(vals[colMap['zone'] ?? 3]).toUpperCase().replaceAll('"', "").trim(),
+                name: String(vals[colMap['name'] ?? 4]).toUpperCase().replaceAll('"', "").trim(),
                 occupied: occupiedVal === 'true' || occupiedVal === '1' || occupiedVal === 'yes',
                 size_x: parseInt(vals[colMap['size_x']]) || 1,
                 size_y: parseInt(vals[colMap['size_y']]) || 1,
-                size_z: parseInt(vals[colMap['size_z']]) || 1
+                size_z: parseInt(vals[colMap['size_z']]) || 1,
+                enabled: isEnabled
             });
         }
         if (results.length > 0) {

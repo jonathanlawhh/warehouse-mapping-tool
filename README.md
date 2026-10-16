@@ -55,6 +55,7 @@ To import your own warehouse data, use a CSV file with the following headers:
 | `size_x` | Width scaling factor for the box (optional, default: `1`) | Integer |
 | `size_y` | Height scaling factor for the box (optional, default: `1`) | Integer |
 | `size_z` | Depth scaling factor for the box (optional, default: `1`) | Integer |
+| `enabled` | Whether the location is active/enabled (`1` for enabled, `0` for disabled) | Integer |
 
 ## 🛠️ Tech Stack
 
